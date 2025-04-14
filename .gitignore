@@ -11,6 +11,8 @@ node_modules/
 # next.js
 /.next/
 /out/
+frontend/.next/
+*/.next/*
 
 # production
 /build
@@ -68,6 +70,17 @@ ENV/
 
 # Project specific
 backend/uploads/
+document/
+
+# Added Next.js build and cache files
+.next/cache/
+.next/static/webpack/
+.next/trace
+.next/server/
+frontend/.next/cache/
+frontend/.next/static/webpack/
+frontend/.next/trace
+frontend/.next/server/
 
 # Byte-compiled / optimized / DLL files
 *.manifest
@@ -224,3 +237,20 @@ cython_debug/
 
 # PyPI configuration file
 .pypirc
+
+# SQLite database files
+*.db
+*.sqlite
+*.sqlite3
+backend/instance/
+backend/quiz_app.db
+
+# Test files
+backend/downloaded_*.txt
+backend/downloaded_*.json
+backend/downloaded_*.pdf
+backend/downloaded_*.docx
+
+# Alembic
+migrations/versions/__pycache__/
+backend/migrations/versions/__pycache__/
