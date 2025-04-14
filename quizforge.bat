@@ -4,12 +4,17 @@ setlocal enabledelayedexpansion
 :: Set window title
 title QuizForge Launcher
 
-:: Define colors for better UI
-set "BLUE=[36m"
-set "GREEN=[32m"
-set "YELLOW=[33m"
-set "RED=[31m"
-set "RESET=[0m"
+:: Define colors for better UI - use PowerShell-compatible format
+set "ESC="
+for /F "tokens=1,2 delims=#" %%a in ('"prompt #$H#$E# & echo on & for %%b in (1) do rem"') do (
+  set "ESC=%%b"
+)
+
+set "BLUE=%ESC%[36m"
+set "GREEN=%ESC%[32m"
+set "YELLOW=%ESC%[33m"
+set "RED=%ESC%[31m"
+set "RESET=%ESC%[0m"
 
 :: ==========================================
 :: Main Menu
