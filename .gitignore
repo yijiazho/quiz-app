@@ -258,3 +258,20 @@ backend/migrations/versions/__pycache__/
 **/webpack/*.hot-update.*
 **/webpack/*.webpack.hot-update.json
 frontend/.next/static/webpack/**/*.hot-update.*
+
+# Comprehensive Next.js ignores (consolidating previous entries)
+# Ignore all Next.js build output directories and their contents
+**/.next/**
+# In case we move locations, these specific patterns cover critical Next.js artifacts
+**/.next/cache/**
+**/.next/server/**
+**/.next/static/**
+**/.next/trace
+**/.next/*.json
+**/.next/*.js
+# Specific Next.js build artifacts
+**/next-env.d.ts
+**/.next/BUILD_ID
+**/.next/build-manifest.json
+**/.next/react-loadable-manifest.json
+**/.next/images-manifest.json
