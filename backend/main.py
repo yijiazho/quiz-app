@@ -2,10 +2,23 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from app.api import upload
 import logging
+import os
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
 
 # Configure logging
-logging.basicConfig(level=logging.INFO)
+logging_level = os.getenv("LOG_LEVEL", "INFO")
+logging.basicConfig(level=getattr(logging, logging_level))
 logger = logging.getLogger(__name__)
+
+# Import database models to ensure they're registered with SQLAlchemy
+from app.core.database import Base, engine
+from app.models import UploadedFile
+
+# Create database tables
+Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="QuizForge API", description="API for QuizForge application")
 
@@ -52,4 +65,6 @@ app.include_router(upload.router, prefix="/api/upload", tags=["upload"])
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("main:app", host="127.0.0.1", port=8000, reload=True) 
+    host = os.getenv("API_HOST", "127.0.0.1")
+    port = int(os.getenv("API_PORT", 8000))
+    uvicorn.run("main:app", host=host, port=port, reload=True) 
