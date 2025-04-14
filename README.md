@@ -139,9 +139,81 @@ quiz-app/
 - `GET /health`: Health check endpoint
 
 ### Upload API
-- `POST /api/upload`: Upload a file (PDF, DOCX, or TXT)
+- `POST /api/upload`: Upload a file (PDF, DOCX, TXT, or JSON)
   - Request: Multipart form data with `file` field
   - Response: JSON with upload status and file information
+- `GET /api/upload/files`: List all uploaded files
+  - Optional query parameters: `skip` (default: 0), `limit` (default: 100)
+  - Response: JSON with an array of file metadata
+- `GET /api/upload/files/{file_id}`: Get metadata for a specific file
+  - Response: JSON with file metadata (excluding binary content)
+- `GET /api/upload/files/{file_id}/download`: Download a specific file
+  - Response: File content with appropriate content type
+- `DELETE /api/upload/files/{file_id}`: Delete a specific file
+  - Response: JSON with deletion status
+
+## Database Integration
+
+QuizForge uses SQLite for storing uploaded files and their metadata. The database integration provides reliable storage with support for both reading and writing operations.
+
+### Database Schema
+
+The main table `uploaded_files` has the following schema:
+
+```
+uploaded_files:
+- id (primary key, auto-increment)
+- file_id (UUID, indexed for quick lookups)
+- filename (string, NOT NULL)
+- content_type (string, NOT NULL)
+- file_size (integer, NOT NULL)
+- file_content (BLOB, NOT NULL)
+- upload_time (timestamp, default: current time)
+- last_accessed (timestamp, nullable)
+- title (string, nullable)
+- description (text, nullable)
+```
+
+### Accessing the Database
+
+#### Using SQLite CLI
+```
+cd backend
+sqlite3 instance/app.db
+.tables
+SELECT * FROM uploaded_files;
+```
+
+#### Using DB Browser for SQLite
+1. Download from https://sqlitebrowser.org/
+2. Open the database file (located at `backend/instance/app.db`)
+
+### Supported File Operations
+
+- **Upload**: Store files directly in the database as binary blobs
+- **List**: Retrieve a paginated list of all files with metadata
+- **Metadata**: Get detailed information about a specific file
+- **Download**: Retrieve a file's binary content from the database
+- **Delete**: Remove a file and its metadata from the database
+
+### Supported File Types
+
+The system currently supports the following file types:
+- PDF (`.pdf`)
+- Microsoft Word (`.docx`, `.doc`) 
+- Plain Text (`.txt`)
+- JSON (`.json`)
+
+### Testing Database Operations
+
+You can test the database operations using the provided test script:
+
+```
+cd backend
+python test_db_operations.py
+```
+
+This script performs comprehensive testing of all database operations including uploading, listing, downloading, and deleting files.
 
 ## Troubleshooting
 
