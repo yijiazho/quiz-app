@@ -10,10 +10,13 @@
 ### `UPLOAD-002` – File Upload API (Backend)
 - POST `/upload` endpoint
 - Virus scan, size validation
-- Upload to S3
-- Return document ID
 
-### `UPLOAD-003` – File Parser Service (Backend)
+### `UPLOAD-003` – Data Storage (Backend) ✅
+- Choose proper database to store the uploaded files
+- Update the backend endpoint to store the file in the database
+- Support extracting the file from the database
+
+### `UPLOAD-004` – File Parser Service (Backend)
 - Extract structured text from files
 - Remove formatting noise
 - Segment by chapters/sections

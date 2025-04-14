@@ -1,0 +1,5 @@
+This is a sample text file for testing the file upload functionality.
+
+The file should be uploaded to the database and retrievable via the API.
+
+QuizForge API test - UPLOAD-003 
