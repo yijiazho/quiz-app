@@ -54,11 +54,11 @@ async def upload_file(
         file_extension = os.path.splitext(file.filename)[1].lower()
         logger.info(f"File extension: {file_extension}")
         
-        if file_extension not in ['.pdf', '.docx', '.doc', '.txt']:
+        if file_extension not in ['.pdf', '.docx', '.doc', '.txt', '.json']:
             logger.warning(f"Invalid file type: {file_extension}")
             raise HTTPException(
                 status_code=400,
-                detail="Only PDF, DOCX, and TXT files are allowed"
+                detail="Only PDF, DOCX, TXT, and JSON files are allowed"
             )
         
         # Read file content
