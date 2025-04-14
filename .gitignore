@@ -254,3 +254,8 @@ backend/downloaded_*.docx
 # Alembic
 migrations/versions/__pycache__/
 backend/migrations/versions/__pycache__/
+
+# Next.js webpack hot updates
+**/webpack/*.hot-update.*
+**/webpack/*.webpack.hot-update.json
+frontend/.next/static/webpack/**/*.hot-update.*
