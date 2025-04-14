@@ -70,7 +70,6 @@ ENV/
 
 # Project specific
 backend/uploads/
-document/
 
 # Added Next.js build and cache files
 .next/cache/
