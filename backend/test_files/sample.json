@@ -1,0 +1,8 @@
+{
+    "key": "value",
+    "array": [1, 2, 3],
+    "nested": {
+        "field": "data",
+        "numbers": [4, 5, 6]
+    }
+}

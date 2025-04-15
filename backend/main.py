@@ -4,6 +4,7 @@ from app.api import upload
 import logging
 import os
 from dotenv import load_dotenv
+from app.core.cache import init_cache
 
 # Load environment variables
 load_dotenv()
@@ -31,6 +32,15 @@ app.add_middleware(
     allow_headers=["*"],
     expose_headers=["Content-Disposition"]
 )
+
+@app.on_event("startup")
+async def startup_event():
+    """
+    Initialize services on application startup.
+    """
+    logger.info("Initializing application services...")
+    await init_cache()
+    logger.info("Application services initialized")
 
 @app.get("/")
 async def root():

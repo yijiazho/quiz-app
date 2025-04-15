@@ -1,6 +1,6 @@
 from pydantic import BaseModel, Field
 from datetime import datetime
-from typing import Optional, List
+from typing import Optional, List, Dict, Any
 
 class FileMetadata(BaseModel):
     """Schema for file metadata response"""
@@ -29,4 +29,16 @@ class FileUploadResponse(BaseModel):
 class FilesListResponse(BaseModel):
     """Schema for listing files"""
     total: int
-    files: List[FileMetadata] 
+    files: List[FileMetadata]
+
+class ParsedContentResponse(BaseModel):
+    """
+    Schema for parsed file content response.
+    """
+    file_id: str
+    filename: str
+    title: Optional[str] = None
+    content: str
+    sections: List[Dict[str, Any]] = []
+    metadata: Dict[str, Any] = {}
+    parsed_at: datetime 

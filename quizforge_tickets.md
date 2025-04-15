@@ -11,7 +11,7 @@
 - POST `/upload` endpoint
 - Virus scan, size validation
 
-### `UPLOAD-003` – Data Storage (Backend) ✅
+### `UPLOAD-003` – Data Storage (Backend)
 - Choose proper database to store the uploaded files
 - Update the backend endpoint to store the file in the database
 - Support extracting the file from the database
@@ -20,6 +20,13 @@
 - Extract structured text from files
 - Remove formatting noise
 - Segment by chapters/sections
+
+### `UPLOAD-005` – Parser Caching Service (Backend)
+- Implement caching for parsed file content
+- Use FastAPI cache with Redis or in-memory storage
+- Cache invalidation on file updates/deletions
+- Configure cache expiration policies
+- Add cache status monitoring
 
 ---
 
