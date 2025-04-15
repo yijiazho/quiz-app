@@ -1,0 +1,7 @@
+This is a sample text file.
+It has multiple lines.
+And some content.
+This is a new paragraph.
+
+This is another paragraph with some interesting content.
+It contains various words and sentences.
