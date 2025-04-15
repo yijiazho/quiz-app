@@ -7,16 +7,20 @@ import traceback
 from typing import List, Dict, Any, Optional
 from sqlalchemy.orm import Session
 import io
+from datetime import datetime
 
 from app.core.database import get_db
 from app.services.file_service import FileService
-from app.schemas.file import FileMetadata, FileUploadResponse, FilesListResponse
+from app.schemas.file import FileMetadata, FileUploadResponse, FilesListResponse, ParsedContentResponse
+from app.core.cache import get_cached_parsed_content, cache_parsed_content
+from app.services.parser import ParserFactory
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+file_service = FileService()
 
 # Create uploads directory if it doesn't exist
 UPLOAD_DIR = FilePath("uploads")
@@ -222,4 +226,46 @@ def delete_file(
             "message": f"File with ID {file_id} deleted successfully"
         },
         status_code=200
-    ) 
+    )
+
+@router.get("/files/{file_id}/parsed", response_model=ParsedContentResponse)
+async def get_parsed_content(file_id: str):
+    """Get parsed content for a file"""
+    try:
+        # Check cache first
+        cached_content = await get_cached_parsed_content(file_id)
+        if cached_content:
+            return cached_content
+            
+        # Get file from database
+        file_service = FileService()
+        file_data = file_service.get_file_by_id(file_id)
+        if not file_data:
+            raise HTTPException(status_code=404, detail="File not found")
+            
+        # Create temporary file
+        temp_file = file_service.create_temp_file(file_data)
+        
+        try:
+            # Get parser for file
+            parser = ParserFactory.get_parser(temp_file)
+            if not parser:
+                raise HTTPException(status_code=400, detail="Unsupported file type")
+                
+            # Parse file
+            result = parser.parse(temp_file)
+            
+            # Cache the result
+            await cache_parsed_content(file_id, result)
+            
+            return result
+            
+        finally:
+            # Clean up temporary file
+            if os.path.exists(temp_file):
+                os.remove(temp_file)
+                
+    except Exception as e:
+        logger.error(f"Error parsing file {file_id}: {str(e)}")
+        logger.error(traceback.format_exc())
+        raise HTTPException(status_code=500, detail=str(e)) 

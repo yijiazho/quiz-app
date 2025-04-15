@@ -3,7 +3,7 @@ import logging
 import os
 from typing import Dict, Any, List, Optional
 
-from app.core.parser_interface import FileParserInterface, ParserResult
+from app.services.parser_interface import FileParserInterface, ParserResult
 
 logger = logging.getLogger(__name__)
 
@@ -34,194 +34,163 @@ class CSVParser(FileParserInterface):
             raise FileNotFoundError(f"File not found: {file_path}")
             
         try:
-            text = self.get_full_text(file_path)
-            metadata = self._extract_metadata(file_path)
+            # Get the title from the filename
+            title = os.path.splitext(os.path.basename(file_path))[0]
+            
+            # Get full text content
+            content = self.get_full_text(file_path)
+            
+            # Get sections
             sections = self.get_sections(file_path)
             
+            # Get metadata
+            metadata = self._extract_metadata(file_path)
+            
             return ParserResult(
-                text=text,
+                title=title,
+                content=content,
                 sections=sections,
-                metadata=metadata,
-                file_path=file_path
+                metadata=metadata
             )
             
         except Exception as e:
             logger.error(f"Error parsing CSV file {file_path}: {str(e)}")
             raise
-    
+            
     def get_full_text(self, file_path: str) -> str:
         """
-        Extract the full text content from a CSV file.
+        Get the full text content of the CSV file
         
         Args:
             file_path: Path to the CSV file
             
         Returns:
-            The extracted text content as a formatted string
+            String containing the full text content
         """
         try:
-            with open(file_path, 'r', encoding='utf-8', errors='replace') as file:
-                return file.read()
-                
+            with open(file_path, 'r', encoding='utf-8') as f:
+                return f.read()
         except UnicodeDecodeError:
-            # Try different encodings if UTF-8 fails
-            try:
-                with open(file_path, 'r', encoding='latin-1') as file:
-                    return file.read()
-            except Exception as e:
-                logger.error(f"Error reading CSV file with alternate encoding {file_path}: {str(e)}")
-                raise
-        except Exception as e:
-            logger.error(f"Error extracting text from CSV file {file_path}: {str(e)}")
-            raise
-    
-    def get_sections(self, file_path: str) -> List[Dict[str, Any]]:
+            # Fallback to latin-1 if utf-8 fails
+            with open(file_path, 'r', encoding='latin-1') as f:
+                return f.read()
+                
+    def get_sections(self, file_path: str) -> Dict[str, str]:
         """
-        Extract sections from a CSV file, where each section represents a logical
-        part of the data (e.g., header row, data rows).
+        Get sections from the CSV file
         
         Args:
             file_path: Path to the CSV file
             
         Returns:
-            A list of sections, each containing title and content
+            Dictionary mapping section names to their content
         """
+        sections = {}
         try:
-            # Try to parse CSV data
             data = self._parse_csv_data(file_path)
             
-            sections = []
-            
-            # Create a section for headers
-            if data and data[0]:
-                headers = data[0]
-                header_section = {
-                    "title": "Headers",
-                    "content": ", ".join(headers)
-                }
-                sections.append(header_section)
-            
-            # Create sections for data overview
+            if not data:
+                return sections
+                
+            # Add headers section
+            if data[0]:
+                sections['Headers'] = ', '.join(data[0])
+                
+            # Add data summary section
             if len(data) > 1:
-                data_rows = data[1:]
+                sample_rows = data[1:min(6, len(data))]  # Get up to 5 data rows
+                sections['Data Sample'] = '\n'.join(
+                    [', '.join(row) for row in sample_rows]
+                )
                 
-                # Data summary section
-                rows_count = len(data_rows)
-                summary_section = {
-                    "title": "Data Summary",
-                    "content": f"Total rows: {rows_count}\nColumns: {len(data[0]) if data[0] else 0}"
-                }
-                sections.append(summary_section)
-                
-                # Sample data section (first 10 rows)
-                sample_rows = data_rows[:10]
-                sample_content = "\n".join([", ".join(row) for row in sample_rows])
-                if sample_content:
-                    sample_section = {
-                        "title": "Sample Data",
-                        "content": sample_content
-                    }
-                    sections.append(sample_section)
-                
-            # If no sections were found, create a single section with raw content
-            if not sections:
-                full_text = self.get_full_text(file_path)
-                sections = [{"title": "Content", "content": full_text}]
-                
+            # Add statistics section
+            sections['Statistics'] = f"""
+Total Rows: {len(data) - 1}
+Total Columns: {len(data[0]) if data else 0}
+"""
             return sections
             
         except Exception as e:
-            logger.warning(f"Error extracting sections from CSV file {file_path}: {str(e)}")
-            # Fallback to raw text
-            full_text = self.get_full_text(file_path)
-            return [{"title": "Content", "content": full_text}]
-    
+            logger.warning(f"Error getting sections from CSV file: {str(e)}")
+            return sections
+            
     def _parse_csv_data(self, file_path: str) -> List[List[str]]:
         """
-        Parse CSV data into a list of rows.
+        Parse the CSV file and return its data
         
         Args:
             file_path: Path to the CSV file
             
         Returns:
-            A list of rows, where each row is a list of string values
+            List of rows, where each row is a list of strings
         """
-        data = []
-        
         # Try different delimiters and encodings
         delimiters = [',', ';', '\t', '|']
-        encodings = ['utf-8', 'latin-1', 'cp1252']
+        encodings = ['utf-8', 'latin-1']
         
         for encoding in encodings:
             for delimiter in delimiters:
                 try:
-                    with open(file_path, 'r', encoding=encoding, errors='replace') as file:
-                        reader = csv.reader(file, delimiter=delimiter)
+                    with open(file_path, 'r', encoding=encoding) as f:
+                        reader = csv.reader(f, delimiter=delimiter)
                         data = list(reader)
                         
-                    # If we successfully parsed and got multiple rows and columns, return the data
-                    if len(data) > 1 and any(len(row) > 1 for row in data):
-                        logger.info(f"Successfully parsed CSV with delimiter '{delimiter}' and encoding '{encoding}'")
-                        return data
-                        
+                        # If we successfully read data with more than one column,
+                        # assume we found the right delimiter
+                        if data and len(data[0]) > 1:
+                            return data
+                            
                 except Exception as e:
-                    logger.debug(f"Failed parsing CSV with delimiter '{delimiter}' and encoding '{encoding}': {str(e)}")
+                    logger.debug(f"Failed to parse CSV with delimiter '{delimiter}' and encoding '{encoding}': {str(e)}")
                     continue
-        
-        # If we reach here, we either have minimal data or none
-        # Return whatever we have as a last resort
-        if data:
-            return data
-            
-        # Last attempt - just read lines
+                    
+        # If all attempts failed, try one last time with default settings
         try:
-            with open(file_path, 'r', encoding='utf-8', errors='replace') as file:
-                lines = file.readlines()
-                return [line.strip().split(',') for line in lines if line.strip()]
+            with open(file_path, 'r', encoding='utf-8') as f:
+                return list(csv.reader(f))
         except Exception as e:
-            logger.error(f"Failed to parse CSV file {file_path} with any method: {str(e)}")
+            logger.error(f"Failed to parse CSV file: {str(e)}")
             return []
-    
+            
     def _extract_metadata(self, file_path: str) -> Dict[str, Any]:
         """
-        Extract metadata from a CSV file.
+        Extract metadata from the CSV file
         
         Args:
             file_path: Path to the CSV file
             
         Returns:
-            A dictionary containing metadata
+            Dictionary containing metadata
         """
         try:
             file_stats = os.stat(file_path)
-            
-            # Parse the CSV to get additional metadata
-            data = self._parse_csv_data(file_path)
             
             metadata = {
                 "file_size": file_stats.st_size,
                 "created": file_stats.st_ctime,
                 "modified": file_stats.st_mtime,
+                "file_type": "text/csv",
+                "file_name": os.path.basename(file_path)
             }
             
-            # Add CSV-specific metadata
-            if data:
-                metadata.update({
-                    "row_count": len(data),
-                    "column_count": len(data[0]) if data and data[0] else 0,
-                    "has_header": True if data and len(data) > 1 else False
-                })
-                
-                # Try to detect column types
-                if len(data) > 1 and data[0]:
-                    column_names = data[0]
-                    metadata["columns"] = column_names
+            # Try to get CSV-specific metadata
+            try:
+                data = self._parse_csv_data(file_path)
+                if data:
+                    metadata.update({
+                        "row_count": len(data) - 1,  # Exclude header row
+                        "column_count": len(data[0]) if data else 0,
+                        "headers": data[0] if data else []
+                    })
+            except Exception as e:
+                logger.debug(f"Error extracting CSV-specific metadata: {str(e)}")
                 
             return metadata
                 
         except Exception as e:
-            logger.warning(f"Error extracting metadata from CSV file {file_path}: {str(e)}")
-            # Return basic file metadata if extraction fails
+            logger.warning(f"Error extracting metadata from CSV file: {str(e)}")
             return {
-                "file_size": os.path.getsize(file_path)
+                "file_size": os.path.getsize(file_path),
+                "file_type": "text/csv",
+                "file_name": os.path.basename(file_path)
             } 

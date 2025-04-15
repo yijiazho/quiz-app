@@ -3,7 +3,7 @@ import os
 import re
 from typing import Dict, Any, List, Optional
 
-from app.core.parser_interface import FileParserInterface, ParserResult
+from app.services.parser_interface import FileParserInterface, ParserResult
 
 logger = logging.getLogger(__name__)
 
@@ -18,185 +18,152 @@ class TXTParser(FileParserInterface):
         # Regex pattern to identify potential section titles in text files
         self.section_pattern = re.compile(r'^(?:\d+[\.\)]\s*)?([A-Z][^\.!?]*?)(?:\.|\:|\n|$)')
         
-    def parse(self, file_path: str) -> ParserResult:
+    def parse(self, filepath: str) -> ParserResult:
         """
-        Parse a text file and return its structured content.
+        Parse a text file and return its contents and metadata
         
         Args:
-            file_path: Path to the text file
+            filepath: Path to the text file
             
         Returns:
-            A ParserResult object containing the parsed content
+            ParserResult containing the parsed content, sections, and metadata
         """
-        logger.info(f"Parsing text file: {file_path}")
-        
-        if not os.path.exists(file_path):
-            logger.error(f"File not found: {file_path}")
-            raise FileNotFoundError(f"File not found: {file_path}")
-            
         try:
-            text = self.get_full_text(file_path)
-            metadata = self._extract_metadata(file_path)
-            sections = self.get_sections(file_path)
+            # Get the title from the filename
+            title = os.path.splitext(os.path.basename(filepath))[0]
+            
+            # Get the content
+            content = self.get_full_text(filepath)
+            
+            # Get sections
+            sections = self.get_sections(filepath)
+            
+            # Get metadata
+            metadata = self._extract_metadata(filepath)
             
             return ParserResult(
-                text=text,
+                title=title,
+                content=content,
                 sections=sections,
-                metadata=metadata,
-                file_path=file_path
+                metadata=metadata
             )
             
         except Exception as e:
-            logger.error(f"Error parsing text file {file_path}: {str(e)}")
+            logger.error(f"Error parsing text file {filepath}: {str(e)}")
             raise
     
-    def get_full_text(self, file_path: str) -> str:
+    def get_full_text(self, filepath: str) -> str:
         """
-        Extract the full text content from a text file.
+        Get the full text content of the file
         
         Args:
-            file_path: Path to the text file
+            filepath: Path to the text file
             
         Returns:
-            The extracted text content
+            The complete text content of the file
         """
         try:
-            with open(file_path, 'r', encoding='utf-8', errors='replace') as file:
-                return file.read()
-                
+            with open(filepath, 'r', encoding='utf-8') as f:
+                return f.read()
         except UnicodeDecodeError:
-            # Try different encodings if UTF-8 fails
-            try:
-                with open(file_path, 'r', encoding='latin-1') as file:
-                    return file.read()
-            except Exception as e:
-                logger.error(f"Error reading text file with alternate encoding {file_path}: {str(e)}")
-                raise
-        except Exception as e:
-            logger.error(f"Error extracting text from text file {file_path}: {str(e)}")
-            raise
-    
-    def get_sections(self, file_path: str) -> List[Dict[str, Any]]:
+            # Fallback to latin-1 if utf-8 fails
+            with open(filepath, 'r', encoding='latin-1') as f:
+                return f.read()
+                
+    def get_sections(self, filepath: str) -> List[Dict[str, Any]]:
         """
-        Extract sections from a text file using heuristic methods.
+        Get sections from the text file based on pattern matching
         
         Args:
-            file_path: Path to the text file
+            filepath: Path to the text file
             
         Returns:
-            A list of sections, each containing title and content
+            List of dictionaries containing section title and content
         """
         try:
-            full_text = self.get_full_text(file_path)
-            sections = self._extract_sections(full_text)
+            content = self.get_full_text(filepath)
+            sections = []
+            
+            # Split content into lines
+            lines = content.splitlines()
+            
+            current_section = {"title": "Main Content", "content": [], "level": 1}
+            
+            for line in lines:
+                # Check if line matches section pattern
+                match = self.section_pattern.match(line)
                 
-            # If no sections were found, create a single section with all content
+                if match:
+                    # Save previous section if it has content
+                    if current_section["content"]:
+                        current_section["content"] = '\n'.join(current_section["content"])
+                        sections.append(current_section)
+                    
+                    # Start new section
+                    current_section = {
+                        "title": match.group(1).strip(),
+                        "content": [],
+                        "level": 1
+                    }
+                else:
+                    current_section["content"].append(line)
+                    
+            # Save last section
+            if current_section["content"]:
+                current_section["content"] = '\n'.join(current_section["content"])
+                sections.append(current_section)
+                
+            # If no sections were found, use the entire content as one section
             if not sections:
-                sections = [{"title": "Content", "content": full_text}]
+                sections = [{
+                    "title": "Main Content",
+                    "content": content,
+                    "level": 1
+                }]
                 
             return sections
             
         except Exception as e:
-            logger.error(f"Error extracting sections from text file {file_path}: {str(e)}")
+            logger.error(f"Error extracting sections from text file {filepath}: {str(e)}")
             raise
-    
-    def _extract_sections(self, text: str) -> List[Dict[str, Any]]:
+        
+    def _extract_metadata(self, filepath: str) -> Dict[str, Any]:
         """
-        Extract sections from the text content using regex patterns.
+        Extract metadata from the text file
         
         Args:
-            text: The full text content
+            filepath: Path to the text file
             
         Returns:
-            A list of sections, each containing title and content
-        """
-        lines = text.split('\n')
-        sections = []
-        current_section: Optional[Dict[str, Any]] = None
-        current_content = []
-        
-        for line in lines:
-            line = line.strip()
-            if not line:
-                # Keep empty lines in the content but don't use them for section detection
-                if current_section is not None and current_content:
-                    current_content.append("")
-                continue
-                
-            # Check if the line looks like a section heading
-            match = self.section_pattern.match(line)
-            is_uppercase_title = line.isupper() and len(line) < 100 and len(line.split()) <= 7
-            
-            if (match and len(line) < 100) or is_uppercase_title:
-                # If we're in a section, save it before starting a new one
-                if current_section:
-                    current_section["content"] = "\n".join(current_content)
-                    sections.append(current_section)
-                
-                # Start a new section
-                current_section = {
-                    "title": line.strip(),
-                    "content": ""
-                }
-                current_content = []
-            elif current_section is not None:
-                # Add to current section content
-                current_content.append(line)
-            else:
-                # This is content before any recognizable section
-                # Create an introduction section
-                current_section = {
-                    "title": "Introduction",
-                    "content": ""
-                }
-                current_content = [line]
-        
-        # Add the last section
-        if current_section:
-            current_section["content"] = "\n".join(current_content)
-            sections.append(current_section)
-            
-        return sections
-    
-    def _extract_metadata(self, file_path: str) -> Dict[str, Any]:
-        """
-        Extract metadata from a text file.
-        
-        Args:
-            file_path: Path to the text file
-            
-        Returns:
-            A dictionary containing metadata
+            Dictionary containing metadata about the file
         """
         try:
-            file_stats = os.stat(file_path)
+            file_stats = os.stat(filepath)
+            content = self.get_full_text(filepath)
             
-            with open(file_path, 'r', encoding='utf-8', errors='replace') as file:
-                content = file.read()
-                
+            # Count lines, words, and characters
+            lines = content.splitlines()
+            words = content.split()
+            
             metadata = {
                 "file_size": file_stats.st_size,
                 "created": file_stats.st_ctime,
                 "modified": file_stats.st_mtime,
-                "line_count": content.count('\n') + 1,
-                "word_count": self._count_words(content),
+                "file_type": "text/plain",
+                "file_name": os.path.basename(filepath),
+                "line_count": len(lines),
+                "word_count": len(words),
                 "char_count": len(content)
             }
             
-            # Try to find title from first non-empty line
-            lines = content.split('\n')
-            for line in lines:
-                if line.strip():
-                    metadata["title"] = line.strip()[:100]  # Limit title length
-                    break
-                
             return metadata
-                
+            
         except Exception as e:
-            logger.warning(f"Error extracting metadata from text file {file_path}: {str(e)}")
-            # Return basic file metadata if extraction fails
+            logger.warning(f"Error extracting metadata from text file: {str(e)}")
             return {
-                "file_size": os.path.getsize(file_path)
+                "file_size": os.path.getsize(filepath),
+                "file_type": "text/plain",
+                "file_name": os.path.basename(filepath)
             }
     
     def _count_words(self, text: str) -> int:
