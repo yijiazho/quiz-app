@@ -1,54 +1,66 @@
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from app.api import upload
 import logging
-import os
-from dotenv import load_dotenv
+import time
+from app.core.logging_config import configure_logging
+from app.api import upload
+from app.core.database import engine, Base
 from app.core.cache import init_cache
 
-# Load environment variables
-load_dotenv()
-
 # Configure logging
-logging_level = os.getenv("LOG_LEVEL", "INFO")
-logging.basicConfig(level=getattr(logging, logging_level))
+configure_logging()
 logger = logging.getLogger(__name__)
-
-# Import database models to ensure they're registered with SQLAlchemy
-from app.core.database import Base, engine
-from app.models import UploadedFile
 
 # Create database tables
 Base.metadata.create_all(bind=engine)
 
-app = FastAPI(title="QuizForge API", description="API for QuizForge application")
+app = FastAPI(
+    title="QuizForge API",
+    description="API for the QuizForge application",
+    version="1.0.0"
+)
 
-# Configure CORS
+# CORS middleware configuration
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],  # Frontend URL
+    allow_origins=["*"],  # In production, replace with specific origins
     allow_credentials=True,
-    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allow_methods=["*"],
     allow_headers=["*"],
-    expose_headers=["Content-Disposition"]
 )
+
+# Request logging middleware
+@app.middleware("http")
+async def log_requests(request: Request, call_next):
+    start_time = time.time()
+    response = await call_next(request)
+    duration = time.time() - start_time
+    
+    logger.info(
+        f"Method: {request.method} Path: {request.url.path} "
+        f"Status: {response.status_code} Duration: {duration:.2f}s"
+    )
+    return response
 
 @app.on_event("startup")
 async def startup_event():
-    """
-    Initialize services on application startup.
-    """
-    logger.info("Initializing application services...")
+    """Initialize services on startup"""
+    logger.info("Starting up QuizForge API")
     await init_cache()
-    logger.info("Application services initialized")
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    """Cleanup on shutdown"""
+    logger.info("Shutting down QuizForge API")
+
+# Include routers
+app.include_router(upload.router, prefix="/api/upload", tags=["upload"])
 
 @app.get("/")
 async def root():
-    """
-    Root endpoint to check if the API is running.
-    """
-    logger.info("Root endpoint accessed")
-    return {"message": "Welcome to QuizForge API", "status": "ok"}
+    """Root endpoint"""
+    logger.debug("Root endpoint accessed")
+    return {"message": "Welcome to QuizForge API"}
 
 @app.get("/health")
 async def health_check():
@@ -57,21 +69,6 @@ async def health_check():
     """
     logger.info("Health check endpoint accessed")
     return {"status": "ok"}
-
-@app.middleware("http")
-async def log_requests(request: Request, call_next):
-    """
-    Middleware to log all requests.
-    """
-    logger.info(f"Request: {request.method} {request.url}")
-    response = await call_next(request)
-    logger.info(f"Response status: {response.status_code}")
-    return response
-
-# Import and include routers
-app.include_router(upload.router, prefix="/api/upload", tags=["upload"])
-# app.include_router(quiz.router, prefix="/api/quiz", tags=["quiz"])
-# app.include_router(auth.router, prefix="/api/auth", tags=["auth"])
 
 if __name__ == "__main__":
     import uvicorn

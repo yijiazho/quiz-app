@@ -21,6 +21,7 @@ REDIS_HOST = os.getenv("REDIS_HOST", "localhost")
 REDIS_PORT = int(os.getenv("REDIS_PORT", "6379"))
 REDIS_PASSWORD = os.getenv("REDIS_PASSWORD", None)
 REDIS_DB = int(os.getenv("REDIS_DB", "0"))
+USE_REDIS = os.getenv("USE_REDIS", "false").lower() == "true"
 
 # Cache configuration
 CACHE_EXPIRE = int(os.getenv("CACHE_EXPIRE", "3600"))  # Default 1 hour
@@ -34,6 +35,14 @@ async def init_cache():
     """
     Initialize the cache backend.
     """
+    # Use in-memory cache by default for development
+    if not USE_REDIS:
+        logger.info("Using in-memory cache for development")
+        from fastapi_cache.backends.inmemory import InMemoryBackend
+        FastAPICache.init(InMemoryBackend(), prefix=CACHE_PREFIX)
+        logger.info("FastAPI cache initialized with in-memory backend")
+        return
+        
     try:
         # Create Redis client
         redis_client = redis.Redis(
