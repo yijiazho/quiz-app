@@ -9,28 +9,20 @@ node_modules/
 /coverage
 
 # next.js
-/.next/
-/out/
+.next/
 frontend/.next/
-*/.next/*
-
-# production
-/build
+out/
+build/
+dist/
+.vercel
 
 # misc
 .DS_Store
 *.pem
-
-# debug
+.env*.local
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
-
-# local env files
-.env*.local
-
-# vercel
-.vercel
 
 # typescript
 *.tsbuildinfo
@@ -61,6 +53,10 @@ var/
 # Virtual Environment
 venv/
 ENV/
+.env
+.venv
+env.bak/
+venv.bak/
 
 # IDE
 .idea/
@@ -70,24 +66,7 @@ ENV/
 
 # Project specific
 backend/uploads/
-
-# Added Next.js build and cache files
-.next/cache/
-.next/static/webpack/
-.next/trace
-.next/server/
-frontend/.next/cache/
-frontend/.next/static/webpack/
-frontend/.next/trace
-frontend/.next/server/
-
-# Byte-compiled / optimized / DLL files
-*.manifest
-*.spec
-
-# C extensions
-*.mo
-*.pot
+uploads/
 
 # Distribution / packaging
 share/python-wheels/
@@ -95,10 +74,6 @@ share/python-wheels/
 .installed.cfg
 *.egg
 MANIFEST
-
-# Installer logs
-pip-log.txt
-pip-delete-this-directory.txt
 
 # Unit test / coverage reports
 htmlcov/
@@ -115,11 +90,7 @@ coverage.xml
 .pytest_cache/
 cover/
 
-# Translations
-*.mo
-*.pot
-
-# Django stuff:
+# Logs and databases
 *.log
 local_settings.py
 db.sqlite3
@@ -190,15 +161,6 @@ celerybeat.pid
 
 # SageMath parsed files
 *.sage.py
-
-# Environments
-.env
-.venv
-env/
-venv/
-ENV/
-env.bak/
-venv.bak/
 
 # Spyder project settings
 .spyderproject
