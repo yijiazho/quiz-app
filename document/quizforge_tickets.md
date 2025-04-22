@@ -11,7 +11,7 @@
 - POST `/upload` endpoint
 - Virus scan, size validation
 
-### `UPLOAD-003` – Data Storage (Backend) ✅
+### `UPLOAD-003` – Data Storage (Backend)
 - Choose proper database to store the uploaded files
 - Update the backend endpoint to store the file in the database
 - Support extracting the file from the database
@@ -21,21 +21,37 @@
 - Remove formatting noise
 - Segment by chapters/sections
 
+### `UPLOAD-005` – Parser Caching Service (Backend)
+- Implement caching for parsed file content
+- Use FastAPI cache with Redis or in-memory storage
+- Cache invalidation on file updates/deletions
+- Configure cache expiration policies
+- Add cache status monitoring
+
 ---
 
 ## Epic: AI/NLP Quiz Generation
 
-### `AI-001` – Concept & Topic Extraction
-- Keyphrase extraction using NLP tools
-- Handle long content
+### `AI-001` – Integrated Quiz Generation After Upload
+- Automatically generate quiz after file is uploaded and parsed
+- Direct integration with local model (e.g., T5, BART)
+- Avoid using external APIs
+- Save generated quiz to database
 
-### `AI-002` – Question Generator (MCQ + T/F)
-- Use transformer models
-- Generate distractors
-- Filter poor questions
+### `AI-002` – Local Model Setup for NLP
+- Set up and run transformer models locally (T5/BART) using Hugging Face
+- Ensure models can run offline once downloaded
+- Optimize for CPU or GPU as available
 
-### `AI-003` – Answer & Explanation Generator
-- Generate correct answers and short explanations
+### `AI-003` – Save Parsed Text for Reuse
+- Store parsed textbook content in a separate database/table
+- Reference it with file/document ID
+- Use this as the source for quiz regeneration or review
+
+### `AI-004` – Quiz Generation Endpoint Refactor
+- Update quiz generation service to work from parsed text directly
+- Support JSON output format
+- Handle various question types (MCQ, True/False)
 
 ---
 
