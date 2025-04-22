@@ -19,7 +19,6 @@
     "date-fns": "^3.3.1",
     "lucide-react": "^0.344.0",
     "next": "14.1.0",
-    "quizforge-frontend": "file:",
     "react": "^18",
     "react-dom": "^18",
     "react-dropzone": "^14.3.8",

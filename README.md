@@ -34,14 +34,23 @@ QuizForge is an AI-powered web application that allows users to upload textbook 
 
 ### Setup
 
-#### Option 1: Using the QuizForge Launcher (Windows)
-The easiest way to run QuizForge is by using the launcher:
+#### Option 1: Using the QuizForge Launcher
+
+##### Windows
+The easiest way to run QuizForge on Windows is by using the launcher:
 
 ```
 quizforge.bat
 ```
 
-This will open an interactive, color-coded menu with the following options:
+##### macOS/Linux
+For macOS and Linux users, use the shell script:
+
+```bash
+./quizforge.sh
+```
+
+The launcher will open an interactive, color-coded menu with the following options:
 1. Start both frontend and backend
 2. Start backend only
 3. Start frontend only
@@ -66,44 +75,85 @@ For first-time use, you should:
 
 ##### Frontend Setup
 1. Navigate to the frontend directory:
-   ```
+   ```bash
    cd frontend
    ```
 2. Install dependencies:
-   ```
+   ```bash
    npm install
    ```
 3. Start the development server:
-   ```
+   ```bash
    npm run dev
    ```
 
 ##### Backend Setup
 1. Navigate to the backend directory:
-   ```
+   ```bash
    cd backend
    ```
 2. Create a virtual environment:
-   ```
+   ```bash
    python -m venv venv
    ```
 3. Activate the virtual environment:
    - Windows:
-     ```
+     ```bash
      venv\Scripts\activate.bat
      ```
    - macOS/Linux:
-     ```
+     ```bash
      source venv/bin/activate
      ```
 4. Install dependencies:
-   ```
+   ```bash
    pip install -r requirements.txt
    ```
-5. Start the development server:
+5. Start the backend server:
+   ```bash
+   uvicorn main:app --reload --port 8000
    ```
-   uvicorn main:app --reload --host 127.0.0.1 --port 8000
-   ```
+
+## Environment Variables
+
+Create a `.env` file in both the frontend and backend directories with the following variables:
+
+### Frontend (.env)
+```
+NEXT_PUBLIC_API_URL=http://localhost:8000
+```
+
+### Backend (.env)
+```
+DATABASE_URL=postgresql://user:password@localhost:5432/quizforge
+SECRET_KEY=your-secret-key
+```
+
+## Development
+
+### Running Tests
+- Frontend tests:
+  ```bash
+  cd frontend
+  npm test
+  ```
+- Backend tests:
+  ```bash
+  cd backend
+  source venv/bin/activate  # or venv\Scripts\activate.bat on Windows
+  pytest
+  ```
+
+### Code Style
+- Frontend: ESLint and Prettier
+- Backend: Black and isort
+
+## Contributing
+
+1. Fork the repository
+2. Create a new branch
+3. Make your changes
+4. Submit a pull request
 
 ## Project Structure
 
