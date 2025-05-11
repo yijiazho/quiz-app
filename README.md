@@ -127,6 +127,9 @@ NEXT_PUBLIC_API_URL=http://localhost:8000
 ```
 DATABASE_URL=postgresql://user:password@localhost:5432/quizforge
 SECRET_KEY=your-secret-key
+
+# OpenAI API Key (Required for AI features)
+OPENAI_API_KEY=your_openai_api_key_here
 ```
 
 ## Development
