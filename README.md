@@ -298,3 +298,13 @@ Or simply use option 6 in the QuizForge launcher.
 ## License
 
 This project is licensed under the MIT License - see the LICENSE file for details.
+
+## Running Tests
+
+Tests should be run from the project root (`quiz-app`). For example:
+
+```sh
+python -m pytest backend/tests -v
+```
+
+This ensures that the `app` module is correctly importable.

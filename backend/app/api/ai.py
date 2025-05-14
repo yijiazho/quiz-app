@@ -1,51 +1,91 @@
 from fastapi import APIRouter, HTTPException, Depends
-from typing import Dict, Any
-from ..services.ai_interface import AIInterface
-from ..services.openai_service import OpenAIService, OpenAIServiceError
-from ..schemas.ai import QuizGenerationRequest, QuizResponse
-from ..core.dependencies import get_ai_service
-from ..core.cache import get_cache_key, get_cached_content, set_cached_content
+from fastapi.responses import JSONResponse
+import logging
+from typing import Dict, Any, Optional
+from sqlalchemy.orm import Session
+import openai
+from ..core.database import get_db
+from ..core.cache import cache
+from ..services.ai_service import AIService
 
-router = APIRouter(tags=["AI"])
+# Configure logging
+logger = logging.getLogger(__name__)
 
-@router.post("/generate-quiz", response_model=QuizResponse)
+router = APIRouter(prefix="/api/ai", tags=["ai"])
+ai_service = AIService()
+
+@router.post("/generate")
 async def generate_quiz(
-    request: QuizGenerationRequest,
-    ai_service: AIInterface = Depends(get_ai_service)
-) -> QuizResponse:
+    request: Dict[str, Any],
+    db: Session = Depends(get_db)
+) -> Dict[str, Any]:
     """
-    Generate a quiz from the given content.
-    The quiz will be cached for 1 hour to avoid unnecessary API calls.
+    Generate a quiz based on the provided content.
     """
-    # Generate cache key
-    cache_key = get_cache_key(
-        "quiz",
-        content=request.content,
-        num_questions=request.num_questions,
-        question_type=request.question_type,
-        difficulty=request.difficulty
-    )
-    
-    # Try to get from cache
-    cached_result = await get_cached_content(cache_key)
-    if cached_result:
-        return QuizResponse(**cached_result)
-    
     try:
+        # Get parameters from request
+        content = request.get("content")
+        num_questions = request.get("num_questions", 5)
+        difficulty = request.get("difficulty", "medium")
+        
+        if not content:
+            raise HTTPException(status_code=400, detail="Content is required")
+        
+        # Generate cache key
+        cache_key = cache.get_cache_key("quiz", content, num_questions, difficulty)
+        
+        # Check cache first
+        cached_result = cache.get(cache_key)
+        if cached_result:
+            logger.info("Returning cached quiz")
+            return cached_result
+        
         # Generate new quiz
-        async with ai_service as service:
-            result = await service.generate_quiz(
-                content=request.content,
-                num_questions=request.num_questions,
-                question_type=request.question_type,
-                difficulty=request.difficulty
-            )
-            
-            # Cache the result
-            await set_cached_content(cache_key, result.dict())
-            return result
-            
-    except OpenAIServiceError as e:
-        raise HTTPException(status_code=503, detail=str(e))
+        logger.info(f"Generating new quiz with {num_questions} questions at {difficulty} difficulty")
+        quiz = await ai_service.generate_quiz(content, num_questions, difficulty)
+        
+        # Cache the result
+        cache.set(cache_key, quiz)
+        logger.info("Quiz cached successfully")
+        
+        return quiz
+        
     except Exception as e:
-        raise HTTPException(status_code=500, detail="An unexpected error occurred") 
+        logger.error(f"Error generating quiz: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/analyze")
+async def analyze_content(
+    request: Dict[str, Any],
+    db: Session = Depends(get_db)
+) -> Dict[str, Any]:
+    """
+    Analyze content and extract key concepts.
+    """
+    try:
+        content = request.get("content")
+        if not content:
+            raise HTTPException(status_code=400, detail="Content is required")
+        
+        # Generate cache key
+        cache_key = cache.get_cache_key("analysis", content)
+        
+        # Check cache first
+        cached_result = cache.get(cache_key)
+        if cached_result:
+            logger.info("Returning cached analysis")
+            return cached_result
+        
+        # Perform analysis
+        logger.info("Performing content analysis")
+        analysis = await ai_service.analyze_content(content)
+        
+        # Cache the result
+        cache.set(cache_key, analysis)
+        logger.info("Analysis cached successfully")
+        
+        return analysis
+        
+    except Exception as e:
+        logger.error(f"Error analyzing content: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e)) 

@@ -8,56 +8,114 @@ from typing import List, Dict, Any, Optional
 from sqlalchemy.orm import Session
 import io
 from datetime import datetime
+from app.core.cache import cache
+import tempfile
 
 from app.core.database import get_db
 from app.services.file_service import FileService
 from app.schemas.file import FileMetadata, FileUploadResponse, FilesListResponse, ParsedContentResponse
-from app.services.parser import ParserFactory
+from app.services.parser_factory import ParserFactory
+from app.models.parsed_content import ParsedContent
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/upload", tags=["upload"])
+# Update router prefix to match README specification
+router = APIRouter(prefix="/api/upload", tags=["upload"])
 file_service = FileService()
+parser_factory = ParserFactory()
 
 # Create uploads directory if it doesn't exist
 UPLOAD_DIR = FilePath("uploads")
 UPLOAD_DIR.mkdir(exist_ok=True)
 
 @router.get("/")
+@router.get("")  # Handle both with and without trailing slash
 async def check_upload_endpoint():
     """
     Simple endpoint to check if the upload router is working.
     """
+    logger.info("Checking upload endpoint")
     return {"status": "ok", "message": "Upload endpoint is working"}
 
-@router.post("/file", response_model=ParsedContentResponse)
-async def upload_file(file: UploadFile = File(...)) -> Dict[str, Any]:
-    """Upload and parse a file."""
+@router.post("/")
+@router.post("")  # Handle both with and without trailing slash
+async def upload_file(
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db)
+):
+    """
+    Upload a file.
+    """
     try:
-        # Save the file temporarily
-        file_path = f"temp_{file.filename}"
-        with open(file_path, "wb") as f:
-            content = await file.read()
-            f.write(content)
-
+        # Validate file type
+        allowed_types = {
+            'application/pdf': '.pdf',
+            'application/vnd.openxmlformats-officedocument.wordprocessingml.document': '.docx',
+            'application/msword': '.doc',
+            'text/plain': '.txt'
+        }
+        
+        if file.content_type not in allowed_types:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid file type. Allowed types: {', '.join(allowed_types.keys())}"
+            )
+        
+        # Read file content
+        content = await file.read()
+        
+        # Save to database
+        db_file = await file_service.save_file_to_db(
+            db=db,
+            file=file,
+            file_content=content
+        )
+        
+        # Parse the content
         try:
-            # Get the appropriate parser
-            parser = ParserFactory.get_parser(file_path)
-            if not parser:
-                raise HTTPException(status_code=400, detail="Unsupported file type")
-
-            # Parse the file
-            result = parser.parse()
-            return result.dict()
-        finally:
-            # Clean up the temporary file
-            if os.path.exists(file_path):
-                os.remove(file_path)
+            parser = parser_factory.get_parser(file.content_type)
+            # Create a temporary file to parse
+            with tempfile.NamedTemporaryFile(delete=False) as temp_file:
+                temp_file.write(content)
+                temp_file.flush()
+                parsed_result = parser.parse(temp_file.name)
+            
+            # Save parsed content to database
+            db_parsed = ParsedContent(
+                file_id=db_file.file_id,
+                parsed_text=parsed_result.content,
+                content_type=file.content_type,
+                content_metadata=parsed_result.metadata
+            )
+            db.add(db_parsed)
+            db.commit()
+            db.refresh(db_parsed)
+            
+            logger.info(f"Content parsed and saved successfully for file: {file.filename}")
+            parsed_content = db_parsed
+        except Exception as parse_error:
+            logger.error(f"Error parsing file content: {str(parse_error)}")
+            # Don't fail the upload if parsing fails
+            parsed_content = None
+        
+        return {
+            "message": "File uploaded and processed successfully",
+            "file_id": db_file.file_id,
+            "filename": file.filename,
+            "parsed": parsed_content is not None
+        }
+        
+    except HTTPException:
+        # Re-raise HTTP exceptions without wrapping them
+        raise
     except Exception as e:
-        logger.error(f"Error processing file: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"Error uploading file: {str(e)}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error uploading file: {str(e)}"
+        )
 
 @router.get("/files", response_model=FilesListResponse)
 def list_files(
@@ -84,33 +142,38 @@ def get_file_metadata(
 
 @router.get("/files/{file_id}/download")
 def download_file(
-    file_id: str = Path(..., description="The unique identifier of the file"),
+    file_id: str,
     db: Session = Depends(get_db)
 ):
-    """Download a file from the database."""
+    """
+    Download a file by its ID.
+    """
     logger.info(f"Downloading file with ID: {file_id}")
     
-    # Get the file from the database
-    db_file = FileService.get_file_by_id(db, file_id)
-    
-    if not db_file:
-        logger.warning(f"File with ID {file_id} not found for download")
-        raise HTTPException(
-            status_code=404,
-            detail=f"File with ID {file_id} not found"
+    try:
+        file = file_service.get_file_by_id(db, file_id)
+        if not file:
+            raise HTTPException(status_code=404, detail="File not found")
+            
+        # Remove charset from content type if present
+        content_type = file.content_type.split(';')[0]
+            
+        return Response(
+            content=file.file_content,
+            media_type=content_type,
+            headers={
+                "Content-Disposition": f'attachment; filename="{file.filename}"'
+            }
         )
-    
-    # Create a BytesIO object from the file content
-    file_stream = io.BytesIO(db_file.file_content)
-    
-    # Return the file as a streaming response
-    return StreamingResponse(
-        file_stream,
-        media_type=db_file.content_type,
-        headers={
-            "Content-Disposition": f"attachment; filename={db_file.filename}"
-        }
-    )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error downloading file: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error downloading file: {str(e)}"
+        )
 
 @router.delete("/files/{file_id}")
 def delete_file(
