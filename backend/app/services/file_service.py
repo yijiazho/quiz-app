@@ -5,6 +5,7 @@ from fastapi import UploadFile, HTTPException
 from typing import Optional, List, Dict, Any
 
 from app.models.file import UploadedFile
+from app.models.parsed_content import ParsedContent
 
 logger = logging.getLogger(__name__)
 
@@ -66,37 +67,33 @@ class FileService:
     @staticmethod
     def get_file_by_id(db: Session, file_id: str) -> Optional[UploadedFile]:
         """
-        Retrieve a file from the database by ID.
+        Get a file by its ID.
         
         Args:
             db: Database session
-            file_id: The unique identifier of the file
+            file_id: ID of the file to retrieve
             
         Returns:
-            The UploadedFile object or None if not found
+            The file if found, None otherwise
         """
+        logger.info(f"Retrieving file with ID: {file_id}")
+        
         try:
-            logger.info(f"Retrieving file with ID: {file_id}")
+            file = db.query(UploadedFile).filter(UploadedFile.file_id == file_id).first()
             
-            # Get the file from the database
-            db_file = db.query(UploadedFile).filter(UploadedFile.file_id == file_id).first()
-            
-            if db_file:
+            if file:
                 # Update last accessed time
-                db_file.last_accessed = datetime.now()
+                file.last_accessed = datetime.utcnow()
                 db.commit()
-                logger.info(f"File retrieved successfully: {db_file.filename}")
+                logger.info(f"File retrieved successfully: {file.filename}")
             else:
-                logger.warning(f"File with ID {file_id} not found")
+                logger.warning(f"File not found with ID: {file_id}")
                 
-            return db_file
+            return file
             
         except Exception as e:
-            logger.error(f"Error retrieving file from database: {str(e)}")
-            raise HTTPException(
-                status_code=500,
-                detail=f"Failed to retrieve file from database: {str(e)}"
-            )
+            logger.error(f"Error retrieving file: {str(e)}")
+            raise
     
     @staticmethod
     def get_file_metadata(db: Session, file_id: str) -> Dict[str, Any]:
@@ -159,32 +156,34 @@ class FileService:
         
         Args:
             db: Database session
-            file_id: The unique identifier of the file
+            file_id: ID of the file to delete
             
         Returns:
-            True if the file was deleted, False otherwise
+            True if the file was deleted successfully, False otherwise
         """
+        logger.info(f"Deleting file with ID: {file_id}")
+        
         try:
-            logger.info(f"Deleting file with ID: {file_id}")
-            
-            # Get the file from the database
-            db_file = db.query(UploadedFile).filter(UploadedFile.file_id == file_id).first()
-            
-            if not db_file:
-                logger.warning(f"File with ID {file_id} not found for deletion")
+            # Get the file
+            file = FileService.get_file_by_id(db, file_id)
+            if not file:
+                logger.warning(f"File not found: {file_id}")
                 return False
                 
+            # Delete parsed content first
+            parsed_content = db.query(ParsedContent).filter(ParsedContent.file_id == file_id).first()
+            if parsed_content:
+                db.delete(parsed_content)
+                db.commit()
+                
             # Delete the file
-            db.delete(db_file)
+            db.delete(file)
             db.commit()
             
-            logger.info(f"File deleted successfully: {db_file.filename}")
+            logger.info(f"File deleted successfully: {file_id}")
             return True
             
         except Exception as e:
-            db.rollback()
             logger.error(f"Error deleting file from database: {str(e)}")
-            raise HTTPException(
-                status_code=500,
-                detail=f"Failed to delete file from database: {str(e)}"
-            ) 
+            db.rollback()
+            raise 

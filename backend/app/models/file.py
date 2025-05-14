@@ -1,5 +1,6 @@
 from sqlalchemy import Column, Integer, String, LargeBinary, DateTime, Text
 from sqlalchemy.sql import func
+from sqlalchemy.orm import relationship
 import uuid
 from datetime import datetime
 
@@ -26,6 +27,9 @@ class UploadedFile(Base):
     title = Column(String, nullable=True)
     description = Column(Text, nullable=True)
     
+    # Relationship with ParsedContent
+    parsed_content = relationship("ParsedContent", back_populates="file", uselist=False)
+    
     def __repr__(self):
         """String representation of the model"""
         return f"<UploadedFile(id={self.id}, filename={self.filename}, size={self.file_size})>"
@@ -41,5 +45,6 @@ class UploadedFile(Base):
             "upload_time": self.upload_time.isoformat() if self.upload_time else None,
             "last_accessed": self.last_accessed.isoformat() if self.last_accessed else None,
             "title": self.title,
-            "description": self.description
+            "description": self.description,
+            "parsed_content": self.parsed_content.to_dict() if self.parsed_content else None
         } 

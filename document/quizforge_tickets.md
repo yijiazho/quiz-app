@@ -38,6 +38,7 @@
 - Save generated quiz to database
 
 ### `AI-002` – Text Parsing Model
+- Create a new database table to store the parsed text
 - Parse the document in database to get the text content using AI model integrated
 - Ensure we support real-time parsing when uploading the document, or parsing the document from the database
 

@@ -17,6 +17,37 @@ class ParserResult:
         if self.metadata is None:
             self.metadata = {}
 
+class ParserInterface(ABC):
+    """Interface for file parsers"""
+    
+    @abstractmethod
+    async def parse(self, content: bytes) -> Dict[str, Any]:
+        """
+        Parse the file content and return the extracted text and metadata
+        
+        Args:
+            content: The binary content of the file
+            
+        Returns:
+            Dict containing:
+                - parsed_text: The extracted text content
+                - metadata: Additional metadata about the parsed content
+        """
+        pass
+    
+    @abstractmethod
+    def supports_content_type(self, content_type: str) -> bool:
+        """
+        Check if this parser supports the given content type
+        
+        Args:
+            content_type: The MIME type of the file
+            
+        Returns:
+            True if this parser can handle the content type, False otherwise
+        """
+        pass
+
 class FileParserInterface(ABC):
     """Interface for file parsers"""
     
