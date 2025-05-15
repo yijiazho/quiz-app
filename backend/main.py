@@ -3,9 +3,10 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 import logging
 import time
+import uvicorn
 from dotenv import load_dotenv
 from app.core.logging_config import configure_logging
-from app.api import upload, ai
+from app.api import upload, ai, auth
 from app.core.database import engine, Base
 from app.core.cache import init_cache
 
@@ -73,6 +74,7 @@ async def shutdown_event():
 # Include routers
 app.include_router(upload.router, prefix="/api/upload", tags=["upload"])
 app.include_router(ai.router, prefix="/api/ai", tags=["ai"])
+app.include_router(auth.router, prefix="/api", tags=["auth"])
 
 @app.get("/")
 async def root():
