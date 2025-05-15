@@ -3,12 +3,11 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 import logging
 import time
-import uvicorn
 from dotenv import load_dotenv
 from app.core.logging_config import configure_logging
-from app.api import upload, ai, auth
+from app.api import upload, ai, quiz, auth
 from app.core.database import engine, Base
-from app.core.cache import init_cache
+from app.core.cache import init_cache, cache
 
 # Load environment variables
 load_dotenv()
@@ -29,7 +28,7 @@ app = FastAPI(
 # CORS middleware configuration
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # In production, replace with specific origins
+    allow_origins=["http://localhost:3000"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -38,14 +37,23 @@ app.add_middleware(
 # Request logging middleware
 @app.middleware("http")
 async def log_requests(request: Request, call_next):
+    logger.info(f"Request started: {request.method} {request.url}")
+    logger.info(f"Request headers: {dict(request.headers)}")
+    
+    # Log request body for non-GET requests, but skip multipart/form-data
+    if request.method != "GET" and "multipart/form-data" not in request.headers.get("content-type", ""):
+        try:
+            body = await request.body()
+            if body:
+                logger.info(f"Request body: {body.decode()}")
+        except Exception as e:
+            logger.warning(f"Could not log request body: {str(e)}")
+    
     start_time = time.time()
     response = await call_next(request)
-    duration = time.time() - start_time
+    process_time = time.time() - start_time
     
-    logger.info(
-        f"Method: {request.method} Path: {request.url.path} "
-        f"Status: {response.status_code} Duration: {duration:.2f}s"
-    )
+    logger.info(f"Request completed: {request.method} {request.url} - Status: {response.status_code} - Duration: {process_time:.2f}s")
     return response
 
 @app.on_event("startup")
@@ -56,9 +64,9 @@ async def startup_event():
         # Verify OpenAI API key
         api_key = os.getenv("OPENAI_API_KEY")
         if not api_key:
-            logger.error("OPENAI_API_KEY not found in environment variables")
-            raise ValueError("OPENAI_API_KEY not found in environment variables")
-        logger.info("OpenAI API key configured successfully")
+            logger.warning("OpenAI API key not found in environment variables")
+        else:
+            logger.info("OpenAI API key configured successfully")
         
         await init_cache()
         logger.info("Cache initialized successfully")
@@ -72,9 +80,12 @@ async def shutdown_event():
     logger.info("Shutting down QuizForge API")
 
 # Include routers
-app.include_router(upload.router, prefix="/api/upload", tags=["upload"])
+logger.info("Including routers...")
+app.include_router(upload.router, tags=["upload"])  # Removed prefix since it's already in the frontend URL
 app.include_router(ai.router, prefix="/api/ai", tags=["ai"])
-app.include_router(auth.router, prefix="/api", tags=["auth"])
+app.include_router(quiz.router, prefix="/api/quiz", tags=["quiz"])
+app.include_router(auth.router, prefix="/api/auth", tags=["auth"])
+logger.info("Routers included successfully")
 
 @app.get("/")
 async def root():

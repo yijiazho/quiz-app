@@ -34,14 +34,13 @@
 
 ### `AI-001` – Integrated Quiz Generation After Upload
 - Automatically generate quiz after file is uploaded and parsed
-- Direct integration with local model (e.g., T5, BART)
-- Avoid using external APIs
+- Direct integration with AI model
 - Save generated quiz to database
 
-### `AI-002` – Local Model Setup for NLP
-- Set up and run transformer models locally (T5/BART) using Hugging Face
-- Ensure models can run offline once downloaded
-- Optimize for CPU or GPU as available
+### `AI-002` – Text Parsing Model
+- Create a new database table to store the parsed text
+- Parse the document in database to get the text content using AI model integrated
+- Ensure we support real-time parsing when uploading the document, or parsing the document from the database
 
 ### `AI-003` – Save Parsed Text for Reuse
 - Store parsed textbook content in a separate database/table
@@ -52,6 +51,11 @@
 - Update quiz generation service to work from parsed text directly
 - Support JSON output format
 - Handle various question types (MCQ, True/False)
+
+### `AI-005` – Local Model Setup for NLP
+- Set up and run transformer models locally (T5/BART) using Hugging Face
+- Ensure models can run offline once downloaded
+- Optimize for CPU or GPU as available
 
 ---
 

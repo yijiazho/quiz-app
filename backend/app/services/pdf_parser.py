@@ -2,6 +2,7 @@ import logging
 import os
 import re
 from typing import Dict, Any, List, Optional
+import io
 
 try:
     import PyPDF2
@@ -9,9 +10,57 @@ except ImportError:
     logging.error("PyPDF2 not installed. Install it with 'pip install PyPDF2'")
 
 from app.core.parser_interface import FileParserInterface, ParserResult
+from .parser_interface import ParserInterface
 
 logger = logging.getLogger(__name__)
 
+
+class PDFParser(ParserInterface):
+    """Parser for PDF files"""
+    
+    def supports_content_type(self, content_type: str) -> bool:
+        """Check if this parser supports PDF content type"""
+        return content_type.lower() in ['application/pdf', 'pdf']
+    
+    async def parse(self, content: bytes) -> Dict[str, Any]:
+        """
+        Parse PDF content and extract text and metadata
+        
+        Args:
+            content: The binary content of the PDF file
+            
+        Returns:
+            Dict containing:
+                - parsed_text: The extracted text content
+                - metadata: Additional metadata about the PDF
+        """
+        try:
+            # Create a PDF reader object
+            pdf_file = io.BytesIO(content)
+            pdf_reader = PyPDF2.PdfReader(pdf_file)
+            
+            # Extract text from each page
+            text_content = []
+            for page_num in range(len(pdf_reader.pages)):
+                page = pdf_reader.pages[page_num]
+                text_content.append(page.extract_text())
+            
+            # Get PDF metadata
+            metadata = {
+                "num_pages": len(pdf_reader.pages),
+                "title": pdf_reader.metadata.get('/Title', ''),
+                "author": pdf_reader.metadata.get('/Author', ''),
+                "creation_date": pdf_reader.metadata.get('/CreationDate', ''),
+                "modification_date": pdf_reader.metadata.get('/ModDate', '')
+            }
+            
+            return {
+                "parsed_text": "\n\n".join(text_content),
+                "metadata": metadata
+            }
+            
+        except Exception as e:
+            raise ValueError(f"Error parsing PDF: {str(e)}")
 
 class PDFParser(FileParserInterface):
     """
@@ -22,6 +71,18 @@ class PDFParser(FileParserInterface):
         """Initialize the PDF parser."""
         # Regex pattern to identify potential section titles
         self.section_pattern = re.compile(r'^(?:\d+[\.\)]\s*)?([A-Z][^\.!?]*?)(?:\.|\:|\n|$)')
+        
+    def supports_content_type(self, content_type: str) -> bool:
+        """
+        Check if this parser supports the given content type.
+        
+        Args:
+            content_type: The MIME type to check
+            
+        Returns:
+            True if this parser supports the content type, False otherwise
+        """
+        return content_type.lower() == 'application/pdf'
         
     def parse(self, file_path: str) -> ParserResult:
         """
@@ -47,13 +108,17 @@ class PDFParser(FileParserInterface):
                 
             text = self.get_full_text(file_path)
             metadata = self._extract_metadata(file_path)
-            sections = self.get_sections(file_path)
+            sections = self.get_sections(text)
             
+            # If no sections were found, create a single section with all content
+            if not sections:
+                sections = [{"title": "Content", "content": text}]
+                
             return ParserResult(
-                text=text,
+                title=metadata.get('title', os.path.basename(file_path)),
+                content=text,
                 sections=sections,
-                metadata=metadata,
-                file_path=file_path
+                metadata=metadata
             )
             
         except Exception as e:
@@ -62,54 +127,33 @@ class PDFParser(FileParserInterface):
     
     def get_full_text(self, file_path: str) -> str:
         """
-        Extract the full text content from a PDF file.
+        Get the full text content of a PDF file.
         
         Args:
             file_path: Path to the PDF file
             
         Returns:
-            The extracted text content
+            The full text content of the file
         """
+        logger.info(f"Getting full text from PDF file: {file_path}")
+        
+        if not os.path.exists(file_path):
+            logger.error(f"File not found: {file_path}")
+            raise FileNotFoundError(f"File not found: {file_path}")
+            
         try:
             with open(file_path, 'rb') as file:
                 reader = PyPDF2.PdfReader(file)
-                text_parts = []
-                
-                for page_num in range(len(reader.pages)):
-                    page = reader.pages[page_num]
-                    text_parts.append(page.extract_text())
-                
-                return "\n".join([part for part in text_parts if part.strip()])
+                text = ""
+                for page in reader.pages:
+                    text += page.extract_text() + "\n"
+                return text
                 
         except Exception as e:
-            logger.error(f"Error extracting text from PDF file {file_path}: {str(e)}")
+            logger.error(f"Error reading PDF file {file_path}: {str(e)}")
             raise
     
-    def get_sections(self, file_path: str) -> List[Dict[str, Any]]:
-        """
-        Extract sections from a PDF file using heuristic methods.
-        
-        Args:
-            file_path: Path to the PDF file
-            
-        Returns:
-            A list of sections, each containing title and content
-        """
-        try:
-            full_text = self.get_full_text(file_path)
-            sections = self._extract_sections(full_text)
-                
-            # If no sections were found, create a single section with all content
-            if not sections:
-                sections = [{"title": "Content", "content": full_text}]
-                
-            return sections
-            
-        except Exception as e:
-            logger.error(f"Error extracting sections from PDF file {file_path}: {str(e)}")
-            raise
-    
-    def _extract_sections(self, text: str) -> List[Dict[str, Any]]:
+    def get_sections(self, text: str) -> List[Dict[str, Any]]:
         """
         Extract sections from the text content using regex patterns.
         

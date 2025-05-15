@@ -1,6 +1,6 @@
-from sqlalchemy import Column, Integer, String, LargeBinary, DateTime, Text, ForeignKey
-from sqlalchemy.orm import relationship
+from sqlalchemy import Column, Integer, String, LargeBinary, DateTime, Text
 from sqlalchemy.sql import func
+from sqlalchemy.orm import relationship
 import uuid
 from datetime import datetime
 
@@ -23,13 +23,12 @@ class UploadedFile(Base):
     upload_time = Column(DateTime, default=func.now())
     last_accessed = Column(DateTime, nullable=True)
     
-    # Foreign key to link files to users
-    user_id = Column(Integer, ForeignKey('users.id'), nullable=False)
-    owner = relationship("User", back_populates="files")
-    
     # Optional metadata fields for additional information
     title = Column(String, nullable=True)
     description = Column(Text, nullable=True)
+    
+    # Relationship with ParsedContent
+    parsed_content = relationship("ParsedContent", back_populates="file", uselist=False)
     
     def __repr__(self):
         """String representation of the model"""
@@ -47,5 +46,5 @@ class UploadedFile(Base):
             "last_accessed": self.last_accessed.isoformat() if self.last_accessed else None,
             "title": self.title,
             "description": self.description,
-            "user_id": self.user_id
+            "parsed_content": self.parsed_content.to_dict() if self.parsed_content else None
         } 

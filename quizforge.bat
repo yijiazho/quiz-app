@@ -33,10 +33,11 @@ echo %GREEN%4.%RESET% Install dependencies
 echo %GREEN%5.%RESET% Update dependencies
 echo %GREEN%6.%RESET% Run tests
 echo %GREEN%7.%RESET% Clean up (stop all servers)
+echo %GREEN%8.%RESET% Clean caches
 echo %GREEN%0.%RESET% Exit
 echo.
 
-set /p choice="Enter your choice (0-7): "
+set /p choice="Enter your choice (0-8): "
 
 if "%choice%"=="1" goto START_ALL
 if "%choice%"=="2" goto START_BACKEND
@@ -45,6 +46,7 @@ if "%choice%"=="4" goto INSTALL_DEPS
 if "%choice%"=="5" goto UPDATE_DEPS
 if "%choice%"=="6" goto RUN_TESTS
 if "%choice%"=="7" goto CLEANUP
+if "%choice%"=="8" goto CLEAN_CACHE
 if "%choice%"=="0" goto END
 
 echo %RED%Invalid choice. Please try again.%RESET%
@@ -220,6 +222,46 @@ goto MAIN_MENU
 :CLEANUP
 call :KILL_SERVERS
 echo %GREEN%All servers have been stopped.%RESET%
+echo.
+echo %YELLOW%Press any key to return to the main menu...%RESET%
+pause > nul
+goto MAIN_MENU
+
+:CLEAN_CACHE
+echo %YELLOW%Cleaning caches...%RESET%
+
+:: Clean frontend cache
+echo %YELLOW%Cleaning frontend cache...%RESET%
+cd frontend
+if exist .next (
+    echo %YELLOW%Removing Next.js build cache...%RESET%
+    rmdir /s /q .next
+)
+if exist node_modules\.cache (
+    echo %YELLOW%Removing npm cache...%RESET%
+    rmdir /s /q node_modules\.cache
+)
+cd ..
+
+:: Clean backend cache
+echo %YELLOW%Cleaning backend cache...%RESET%
+cd backend
+if exist __pycache__ (
+    echo %YELLOW%Removing Python cache...%RESET%
+    rmdir /s /q __pycache__
+)
+if exist app\__pycache__ (
+    echo %YELLOW%Removing app Python cache...%RESET%
+    rmdir /s /q app\__pycache__
+)
+if exist app\api\__pycache__ (
+    echo %YELLOW%Removing API Python cache...%RESET%
+    rmdir /s /q app\api\__pycache__
+)
+cd ..
+
+echo.
+echo %GREEN%Cache cleaning completed!%RESET%
 echo.
 echo %YELLOW%Press any key to return to the main menu...%RESET%
 pause > nul

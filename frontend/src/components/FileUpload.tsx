@@ -99,21 +99,26 @@ export default function FileUpload() {
       const formData = new FormData()
       formData.append('file', file)
       
-      console.log('Uploading to:', `${API_URL}/api/upload`);
+      const uploadUrl = `${API_URL}/api/upload/`;
+      console.log('Starting file upload:', {
+        url: uploadUrl,
+        fileName: file.name,
+        fileType: file.type,
+        fileSize: file.size
+      });
       
-      const response = await fetch(`${API_URL}/api/upload`, {
+      const response = await fetch(uploadUrl, {
         method: 'POST',
-        body: formData,
-        // No Content-Type header for multipart/form-data, browser will set it
-      })
+        body: formData
+      });
       
       if (!response.ok) {
         const errorData = await response.json().catch(() => null);
         throw new Error(errorData?.detail || `Upload failed with status: ${response.status}`);
       }
       
-      const data = await response.json()
-      console.log('Upload successful:', data)
+      const data = await response.json();
+      console.log('Upload successful:', data);
       
       // Set success message
       setSuccess('File uploaded successfully!')
@@ -121,15 +126,12 @@ export default function FileUpload() {
       // Reset file selection after successful upload
       setFile(null)
     } catch (err) {
-      console.error('Upload error:', err)
+      console.error('Upload error:', err);
       
-      // Provide more specific error messages based on the error
       if (err instanceof Error) {
         if (err.message.includes('Failed to fetch') || err.message.includes('NetworkError')) {
           setError('Network error: Cannot connect to the server. Please ensure the backend is running.');
           setApiAvailable(false);
-        } else if (err.message.includes('Unexpected token')) {
-          setError('Received invalid response from server.');
         } else {
           setError(err.message);
         }
