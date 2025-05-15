@@ -1,46 +1,38 @@
 'use client'
 
-import React, { useState, useEffect } from 'react'
+import React, { useState } from 'react'
 
 // API base URL - can be adjusted based on environment
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
-interface FileMetadata {
+console.log('FileList component loaded, API_URL:', API_URL);
+
+interface ParsedContent {
+  content_id: string;
   file_id: string;
-  filename: string;
   content_type: string;
-  file_size: number;
-  upload_time: string;
-  last_accessed: string;
-  title?: string;
-  description?: string;
+  parsed_text: string;
+  content_metadata: {
+    file_size: number;
+    encoding?: string;
+  };
+  parse_time: string;
+  last_updated: string;
 }
 
-export default function FileList() {
-  const [files, setFiles] = useState<FileMetadata[]>([]);
-  const [loading, setLoading] = useState(true);
+interface ParsedContentsResponse {
+  total: number;
+  contents: ParsedContent[];
+}
+
+interface FileListProps {
+  initialFiles: ParsedContent[];
+}
+
+export default function FileList({ initialFiles }: FileListProps) {
+  const [files, setFiles] = useState<ParsedContent[]>(initialFiles);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  const fetchFiles = async () => {
-    try {
-      const response = await fetch(`${API_URL}/api/upload/files`);
-      if (!response.ok) {
-        throw new Error('Failed to fetch files');
-      }
-      const data = await response.json();
-      setFiles(data.files);
-      setError(null);
-    } catch (err) {
-      console.error('Error fetching files:', err);
-      setError('Failed to load files. Please try again later.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchFiles();
-  }, []);
 
   const handleDelete = async (fileId: string) => {
     if (!confirm('Are you sure you want to delete this file?')) {
@@ -56,15 +48,15 @@ export default function FileList() {
         throw new Error('Failed to delete file');
       }
 
-      // Refresh the file list
-      fetchFiles();
+      // Update the local state
+      setFiles(files.filter(file => file.file_id !== fileId));
     } catch (err) {
       console.error('Error deleting file:', err);
       setError('Failed to delete file. Please try again later.');
     }
   };
 
-  const handleDownload = async (fileId: string, filename: string) => {
+  const handleDownload = async (fileId: string) => {
     try {
       const response = await fetch(`${API_URL}/api/upload/files/${fileId}/download`);
       if (!response.ok) {
@@ -78,7 +70,7 @@ export default function FileList() {
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = filename;
+      a.download = `file_${fileId}`; // We don't have filename in parsed content
       document.body.appendChild(a);
       a.click();
       
@@ -110,7 +102,7 @@ export default function FileList() {
   if (files.length === 0) {
     return (
       <div className="text-center py-8">
-        <p className="text-gray-500">No files uploaded yet.</p>
+        <p className="text-gray-500">No files uploaded yet. Go to the Upload page to add your first document.</p>
       </div>
     );
   }
@@ -122,7 +114,7 @@ export default function FileList() {
           <thead className="bg-gray-50">
             <tr>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Filename
+                File ID
               </th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Type
@@ -131,7 +123,7 @@ export default function FileList() {
                 Size
               </th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Uploaded
+                Parsed
               </th>
               <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Actions
@@ -140,29 +132,29 @@ export default function FileList() {
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
             {files.map((file) => (
-              <tr key={file.file_id}>
+              <tr key={file.content_id}>
                 <td className="px-6 py-4 whitespace-nowrap">
-                  <div className="text-sm font-medium text-gray-900">{file.filename}</div>
-                  {file.title && (
-                    <div className="text-sm text-gray-500">{file.title}</div>
-                  )}
+                  <div className="text-sm font-medium text-gray-900">{file.file_id}</div>
+                  <div className="text-sm text-gray-500">
+                    {file.parsed_text.substring(0, 50)}...
+                  </div>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">
                   <div className="text-sm text-gray-500">{file.content_type}</div>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">
                   <div className="text-sm text-gray-500">
-                    {(file.file_size / 1024).toFixed(1)} KB
+                    {(file.content_metadata.file_size / 1024).toFixed(1)} KB
                   </div>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">
                   <div className="text-sm text-gray-500">
-                    {new Date(file.upload_time).toLocaleDateString()}
+                    {new Date(file.parse_time).toLocaleDateString()}
                   </div>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                   <button
-                    onClick={() => handleDownload(file.file_id, file.filename)}
+                    onClick={() => handleDownload(file.file_id)}
                     className="text-primary-600 hover:text-primary-900 mr-4"
                   >
                     Download

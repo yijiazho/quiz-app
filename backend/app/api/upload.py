@@ -198,4 +198,61 @@ def delete_file(
             "message": f"File with ID {file_id} deleted successfully"
         },
         status_code=200
-    ) 
+    )
+
+@router.get("/parsed-contents")
+def list_parsed_contents(
+    skip: int = 0, 
+    limit: int = 100,
+    db: Session = Depends(get_db)
+):
+    """List all parsed contents."""
+    logger.info("=== Starting parsed-contents request ===")
+    logger.info(f"Request parameters - skip: {skip}, limit: {limit}")
+    
+    try:
+        # Query parsed contents
+        logger.info("Executing database query...")
+        parsed_contents = db.query(ParsedContent).offset(skip).limit(limit).all()
+        logger.info(f"Database query returned {len(parsed_contents)} results")
+        
+        # Log the first few results for debugging
+        for i, content in enumerate(parsed_contents[:3]):
+            logger.info(f"Content {i + 1}:")
+            logger.info(f"  - content_id: {content.content_id}")
+            logger.info(f"  - file_id: {content.file_id}")
+            logger.info(f"  - content_type: {content.content_type}")
+        
+        # Convert to dictionaries
+        contents = [
+            {
+                "content_id": content.content_id,
+                "file_id": content.file_id,
+                "content_type": content.content_type,
+                "parsed_text": content.parsed_text,
+                "content_metadata": content.content_metadata,
+                "parse_time": content.parse_time.isoformat() if content.parse_time else None,
+                "last_updated": content.last_updated.isoformat() if content.last_updated else None
+            }
+            for content in parsed_contents
+        ]
+        
+        response_data = {
+            "total": len(contents),
+            "contents": contents
+        }
+        logger.info(f"Preparing response with {len(contents)} contents")
+        logger.info("=== Completed parsed-contents request ===")
+        
+        return response_data
+        
+    except Exception as e:
+        logger.error("=== Error in parsed-contents request ===")
+        logger.error(f"Error type: {type(e).__name__}")
+        logger.error(f"Error message: {str(e)}")
+        logger.error(f"Traceback: {traceback.format_exc()}")
+        logger.error("=== End of error log ===")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error listing parsed contents: {str(e)}"
+        ) 

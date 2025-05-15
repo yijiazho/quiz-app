@@ -45,7 +45,8 @@ class FileService:
                 file_size=len(file_content),
                 file_content=file_content,
                 title=title,
-                description=description
+                description=description,
+                upload_time=datetime.utcnow()
             )
             
             # Add to database and commit
@@ -93,7 +94,10 @@ class FileService:
             
         except Exception as e:
             logger.error(f"Error retrieving file: {str(e)}")
-            raise
+            raise HTTPException(
+                status_code=500,
+                detail=f"Failed to retrieve file: {str(e)}"
+            )
     
     @staticmethod
     def get_file_metadata(db: Session, file_id: str) -> Dict[str, Any]:
@@ -186,4 +190,7 @@ class FileService:
         except Exception as e:
             logger.error(f"Error deleting file from database: {str(e)}")
             db.rollback()
-            raise 
+            raise HTTPException(
+                status_code=500,
+                detail=f"Failed to delete file: {str(e)}"
+            ) 
