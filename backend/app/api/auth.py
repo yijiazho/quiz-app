@@ -83,6 +83,9 @@ async def register(
         db.commit()
         db.refresh(user)
         return user.to_dict()
+    except HTTPException:
+        # Re-raise HTTP exceptions without wrapping them
+        raise
     except Exception as e:
         logger.error(f"Error during registration: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))

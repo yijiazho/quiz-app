@@ -46,7 +46,11 @@ export default function RegisterPage() {
       await registerUser(data.email, data.password, data.fullName)
       router.push('/')
     } catch (err) {
-      setError('Registration failed. Please try again.')
+      if (err instanceof Error) {
+        setError(err.message)
+      } else {
+        setError('Registration failed. Please try again.')
+      }
     } finally {
       setIsLoading(false)
     }
