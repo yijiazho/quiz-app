@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, LargeBinary, DateTime, Text
+from sqlalchemy import Column, Integer, String, LargeBinary, DateTime, Text, ForeignKey
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
 import uuid
@@ -26,6 +26,10 @@ class UploadedFile(Base):
     # Optional metadata fields for additional information
     title = Column(String, nullable=True)
     description = Column(Text, nullable=True)
+    
+    # Add user relationship
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    owner = relationship("User", back_populates="files")
     
     # Relationship with ParsedContent
     parsed_content = relationship("ParsedContent", back_populates="file", uselist=False)
