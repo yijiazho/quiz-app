@@ -1,30 +1,27 @@
 import pytest
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker, clear_mappers
-from app.core.database import Base, get_db
+from sqlalchemy.orm import clear_mappers
+from app.core.database_config import DatabaseConfig
 from app.models import UploadedFile, ParsedContent
-from app.main import app
-from fastapi.testclient import TestClient
-
-# Use an in-memory SQLite database for testing
-TEST_DATABASE_URL = "sqlite:///:memory:"
+from app.models.user import User
 
 @pytest.fixture(scope="session")
-def engine():
-    """Create a test database engine."""
-    engine = create_engine(
-        TEST_DATABASE_URL,
-        connect_args={"check_same_thread": False}
-    )
+def db_config():
+    """Create a test database configuration."""
+    config = DatabaseConfig(env="test")
     clear_mappers()
-    Base.metadata.create_all(bind=engine)
-    yield engine
-    Base.metadata.drop_all(bind=engine)
+    config.init_db()
+    yield config
+    config.drop_db()
 
 @pytest.fixture(scope="session")
-def SessionLocal(engine):
-    """Create a session factory for the test database."""
-    return sessionmaker(autocommit=False, autoflush=False, bind=engine)
+def engine(db_config):
+    """Get the test database engine."""
+    return db_config.engine
+
+@pytest.fixture(scope="session")
+def SessionLocal(db_config):
+    """Get the test session factory."""
+    return db_config.SessionLocal
 
 @pytest.fixture
 def db(SessionLocal):
@@ -38,6 +35,9 @@ def db(SessionLocal):
 @pytest.fixture
 def client(db):
     """Create a test client with a test database session."""
+    from app.main import app
+    from app.core.database import get_db
+    
     def override_get_db():
         try:
             yield db
@@ -45,6 +45,7 @@ def client(db):
             db.close()
     
     app.dependency_overrides[get_db] = override_get_db
+    from fastapi.testclient import TestClient
     with TestClient(app) as test_client:
         yield test_client
     app.dependency_overrides.clear() 

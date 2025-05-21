@@ -9,6 +9,9 @@ from jose import JWTError, jwt
 from passlib.context import CryptContext
 from ..core.database import get_db
 from ..core.config import settings
+from ..models.user import User
+from ..schemas.auth import UserCreate, UserResponse
+from ..core.security import get_password_hash
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -17,7 +20,7 @@ logger = logging.getLogger(__name__)
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
-router = APIRouter(prefix="/api/auth", tags=["auth"])
+router = APIRouter()
 
 # JWT settings
 SECRET_KEY = "your-secret-key"  # TODO: Move to environment variables
@@ -56,20 +59,30 @@ async def login(
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-@router.post("/register")
+@router.post("/register", response_model=UserResponse)
 async def register(
-    user_data: Dict[str, Any],
+    user_data: UserCreate,
     db: Session = Depends(get_db)
-) -> Dict[str, Any]:
+) -> Any:
     """
     Register a new user.
     """
     try:
-        # TODO: Implement user registration
-        return {
-            "status": "success",
-            "message": "User registered successfully"
-        }
+        # Check if user already exists
+        existing_user = db.query(User).filter(User.email == user_data.email).first()
+        if existing_user:
+            raise HTTPException(status_code=400, detail="Email already registered")
+        # Create user
+        hashed_password = get_password_hash(user_data.password)
+        user = User(
+            email=user_data.email,
+            hashed_password=hashed_password,
+            full_name=user_data.full_name
+        )
+        db.add(user)
+        db.commit()
+        db.refresh(user)
+        return user.to_dict()
     except Exception as e:
         logger.error(f"Error during registration: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))

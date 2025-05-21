@@ -36,31 +36,25 @@ QuizForge is an AI-powered web application that allows users to upload textbook 
 
 ### Setup
 
-#### Option 1: Using the QuizForge Launcher (Recommended)
+#### Option 1: Using the macOS Setup Script (Recommended for macOS)
 
-1. Make the launcher script executable:
+1. Make the setup script executable:
    ```bash
-   chmod +x quizforge.sh
+   chmod +x setup_mac.sh
    ```
 
-2. Run the launcher:
+2. Run the setup script:
    ```bash
-   ./quizforge.sh
+   ./setup_mac.sh
    ```
 
-The launcher will open an interactive, color-coded menu with the following options:
-1. Start both frontend and backend
-2. Start backend only
-3. Start frontend only
-4. Install dependencies
-5. Update dependencies
-6. Run tests
-7. Clean up (stop all servers)
-0. Exit
-
-For first-time use:
-1. Select option 4 to install all dependencies
-2. Then select option 1 to start both servers
+The script will:
+- Install Homebrew if not present
+- Install Python 3.12 if not present
+- Install Node.js if not present
+- Set up the backend virtual environment and dependencies
+- Set up the frontend dependencies
+- Create necessary .env files
 
 #### Option 2: Manual Setup
 
@@ -180,6 +174,21 @@ For first-time use:
    # The database will be recreated on next server start
    ```
 
+5. **macOS-specific Issues**
+   - If you get permission errors when running scripts:
+     ```bash
+     chmod +x setup_mac.sh
+     ```
+   - If Python 3.12 installation fails:
+     ```bash
+     brew update
+     brew install python@3.12
+     ```
+   - If you get SSL errors:
+     ```bash
+     /Applications/Python\ 3.12/Install\ Certificates.command
+     ```
+
 ## Contributing
 
 1. Fork the repository
@@ -198,19 +207,16 @@ quiz-app/
 │   │   └── lib/               # Utility functions
 │   ├── public/                # Static assets
 │   ├── package.json
-│   ├── tsconfig.json
-│   ├── tailwind.config.js
-│   └── postcss.config.js
+│   └── .env                   # Frontend environment variables
 ├── backend/                   # Backend application
 │   ├── app/
-│   │   ├── api/               # API endpoints
-│   │   ├── core/              # Core functionality
-│   │   ├── models/            # Database models
-│   │   └── services/          # Services
-│   ├── main.py                # Main application entry point
-│   ├── venv/                  # Python virtual environment
-│   └── requirements.txt       # Python dependencies
-├── quizforge.bat              # Interactive launcher script (Windows)
+│   │   ├── api/              # API endpoints
+│   │   ├── core/             # Core functionality
+│   │   ├── models/           # Database models
+│   │   └── schemas/          # Pydantic schemas
+│   ├── requirements.txt
+│   └── .env                  # Backend environment variables
+├── setup_mac.sh              # macOS setup script
 └── README.md
 ```
 
