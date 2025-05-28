@@ -2,7 +2,7 @@ from sqlalchemy import Column, Integer, String, LargeBinary, DateTime, Text, For
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
 import uuid
-from datetime import datetime
+from datetime import datetime, UTC
 
 from app.core.database import Base
 
@@ -14,34 +14,32 @@ class UploadedFile(Base):
     """Model for storing uploaded files in the database"""
     __tablename__ = "uploaded_files"
 
-    id = Column(Integer, primary_key=True, index=True)
-    file_id = Column(String, unique=True, index=True, default=generate_uuid)
+    file_id = Column(String, primary_key=True)
     filename = Column(String, nullable=False)
     content_type = Column(String, nullable=False)
     file_size = Column(Integer, nullable=False)
     file_content = Column(LargeBinary, nullable=False)  # Stores the binary content of the file
-    upload_time = Column(DateTime, default=func.now())
-    last_accessed = Column(DateTime, nullable=True)
+    upload_time = Column(DateTime, nullable=False, default=lambda: datetime.now(UTC))
+    last_accessed = Column(DateTime)
     
     # Optional metadata fields for additional information
-    title = Column(String, nullable=True)
-    description = Column(Text, nullable=True)
+    title = Column(String)
+    description = Column(String)
     
     # Add user relationship
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
-    owner = relationship("User", back_populates="files")
+    user_id = Column(String, ForeignKey("users.id"))
+    user = relationship("User", back_populates="files")
     
     # Relationship with ParsedContent
-    parsed_content = relationship("ParsedContent", back_populates="file", uselist=False)
+    parsed_contents = relationship("ParsedContent", back_populates="file", cascade="all, delete-orphan")
     
     def __repr__(self):
         """String representation of the model"""
-        return f"<UploadedFile(id={self.id}, filename={self.filename}, size={self.file_size})>"
+        return f"<UploadedFile(file_id='{self.file_id}', filename='{self.filename}')>"
     
     def to_dict(self):
         """Convert model to dictionary (excluding binary content)"""
         return {
-            "id": self.id,
             "file_id": self.file_id,
             "filename": self.filename,
             "content_type": self.content_type,
@@ -50,5 +48,5 @@ class UploadedFile(Base):
             "last_accessed": self.last_accessed.isoformat() if self.last_accessed else None,
             "title": self.title,
             "description": self.description,
-            "parsed_content": self.parsed_content.to_dict() if self.parsed_content else None
+            "parsed_contents": [parsed_content.to_dict() for parsed_content in self.parsed_contents]
         } 

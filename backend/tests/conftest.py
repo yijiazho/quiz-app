@@ -1,51 +1,58 @@
 import pytest
-from sqlalchemy.orm import clear_mappers
-from app.core.database_config import DatabaseConfig
-from app.models import UploadedFile, ParsedContent
-from app.models.user import User
+from app.core.database_config import config, Base
+from app.main import app
+from fastapi.testclient import TestClient
+from sqlalchemy.orm import Session
+from app.core.migrations import run_migrations
+import logging
+from sqlalchemy.sql import text
+
+logger = logging.getLogger(__name__)
 
 @pytest.fixture(scope="session")
-def db_config():
-    """Create a test database configuration."""
-    config = DatabaseConfig(env="test")
-    clear_mappers()
-    config.init_db()
-    yield config
-    config.drop_db()
-
-@pytest.fixture(scope="session")
-def engine(db_config):
-    """Get the test database engine."""
-    return db_config.engine
-
-@pytest.fixture(scope="session")
-def SessionLocal(db_config):
-    """Get the test session factory."""
-    return db_config.SessionLocal
-
-@pytest.fixture
-def db(SessionLocal):
+def test_db():
     """Create a test database session."""
-    session = SessionLocal()
+    # Create all tables
+    Base.metadata.create_all(bind=config.engine)
+    
+    # Create a new session
+    connection = config.engine.connect()
+    transaction = connection.begin()
+    session = Session(bind=connection)
+    
     try:
         yield session
     finally:
         session.close()
+        transaction.rollback()
+        connection.close()
+        # Drop all tables
+        Base.metadata.drop_all(bind=config.engine)
 
 @pytest.fixture
-def client(db):
+def client(test_db):
     """Create a test client with a test database session."""
-    from app.main import app
-    from app.core.database import get_db
-    
     def override_get_db():
         try:
-            yield db
+            yield test_db
         finally:
-            db.close()
+            pass  # Don't close the session here, it's managed by the test_db fixture
     
     app.dependency_overrides[get_db] = override_get_db
-    from fastapi.testclient import TestClient
-    with TestClient(app) as test_client:
-        yield test_client
-    app.dependency_overrides.clear() 
+    return TestClient(app)
+
+@pytest.fixture
+def db(test_db):
+    """Create a fresh database for each test."""
+    # Clear the tables
+    test_db.execute(text("DELETE FROM parsed_contents"))
+    test_db.execute(text("DELETE FROM uploaded_files"))
+    test_db.commit()
+    
+    try:
+        yield test_db
+    finally:
+        # Clear the tables after the test
+        test_db.execute(text("DELETE FROM parsed_contents"))
+        test_db.execute(text("DELETE FROM uploaded_files"))
+        test_db.commit() 

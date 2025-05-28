@@ -1,0 +1,3 @@
+@echo off
+echo Running tests...
+pytest tests/ -v --cov=app --cov-report=term-missing 

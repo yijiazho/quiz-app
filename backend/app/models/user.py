@@ -21,7 +21,7 @@ class User(Base):
     updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
 
     # Relationships
-    files = relationship("UploadedFile", back_populates="owner")
+    files = relationship("UploadedFile", back_populates="user")
 
     def __repr__(self):
         return f"<User(id={self.id}, email={self.email})>"
