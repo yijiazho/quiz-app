@@ -82,6 +82,52 @@ stop_servers() {
     echo -e "${GREEN}All servers stopped${NC}"
 }
 
+# Function to run tests
+run_tests() {
+    echo -e "${BLUE}Choose test environment:${NC}"
+    echo "1. Run tests in Docker (recommended)"
+    echo "2. Run tests locally"
+    
+    read -p "Enter your choice (1-2): " test_env
+    
+    case $test_env in
+        1)
+            echo -e "${YELLOW}Running tests in Docker...${NC}"
+            
+            echo -e "${YELLOW}Running backend tests...${NC}"
+            docker-compose run --rm backend pytest
+            
+            echo -e "${YELLOW}Running frontend tests...${NC}"
+            docker-compose run --rm frontend npm test
+            ;;
+        2)
+            echo -e "${YELLOW}Running backend tests locally...${NC}"
+            cd backend
+            source venv/bin/activate
+            python -m pytest
+            TEST_STATUS=$?
+            deactivate
+            cd ..
+            
+            if [ $TEST_STATUS -eq 0 ]; then
+                echo -e "${GREEN}✅ Backend tests passed!${NC}"
+            else
+                echo -e "${RED}❌ Backend tests failed.${NC}"
+                echo -e "${YELLOW}Make sure the backend server is running.${NC}"
+            fi
+            
+            echo -e "${YELLOW}Running frontend tests locally...${NC}"
+            cd frontend
+            npm test
+            cd ..
+            ;;
+        *)
+            echo -e "${RED}Invalid choice. Please try again.${NC}"
+            run_tests
+            ;;
+    esac
+}
+
 # Main menu
 while true; do
     echo -e "\n${BLUE}QuizForge Launcher${NC}"
@@ -119,8 +165,7 @@ while true; do
             install_dependencies
             ;;
         6)
-            echo -e "${YELLOW}Running tests...${NC}"
-            # Add test commands here
+            run_tests
             ;;
         7)
             stop_servers

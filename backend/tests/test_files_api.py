@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 from datetime import datetime, UTC
 from app.main import app
 from app.models.parsed_content import ParsedContent
-from app.core.database import get_db, engine, Base
+from app.core.database_config import get_db, engine, Base
 from unittest.mock import patch, MagicMock
 from app.models.file import UploadedFile
 from sqlalchemy import text
@@ -135,7 +135,7 @@ def test_list_files_with_data(client, setup_test_data):
 
 def test_list_files_database_error(client):
     """Test handling of database errors."""
-    from app.core.database import get_db
+    from app.core.database_config import get_db
     # Patch the db.query method to raise an exception
     def override_get_db():
         db = next(get_db())

@@ -4,7 +4,7 @@ import logging
 from typing import Dict, Any, Optional
 from sqlalchemy.orm import Session
 import openai
-from ..core.database import get_db
+from ..core.database_config import get_db
 from ..core.cache import cache
 from ..services.ai_service import AIService
 

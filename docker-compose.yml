@@ -1,0 +1,51 @@
+version: '3.8'
+
+services:
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+      - /app/.next
+    environment:
+      - NODE_ENV=development
+      - NEXT_TELEMETRY_DISABLED=1
+    depends_on:
+      - backend
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend:/app
+      - ./backend/data:/app/data
+    environment:
+      - DATABASE_URL=sqlite:///./data/quiz_app.db
+      - SECRET_KEY=your-secret-key-here
+      - ENVIRONMENT=development
+      - LOG_LEVEL=INFO
+
+  adminer:
+    image: adminer:4.8.1
+    restart: always
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./backend/data:/data
+    environment:
+      - ADMINER_DESIGN=pepa-linha
+    command: php -S 0.0.0.0:8080
+
+volumes:
+  postgres_data:
+
+networks:
+  app-network:
+    driver: bridge 

@@ -3,7 +3,7 @@ from fastapi.responses import JSONResponse
 import logging
 from typing import Dict, Any, List
 from sqlalchemy.orm import Session
-from ..core.database import get_db
+from ..core.database_config import get_db
 from ..core.cache import cache
 
 # Configure logging

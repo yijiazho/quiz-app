@@ -199,19 +199,45 @@ goto MAIN_MENU
 :RUN_TESTS
 call :CHECK_PYTHON
 
-echo %YELLOW%Running backend tests...%RESET%
-cd backend
-call venv\Scripts\activate.bat
-python test_api_connection.py
-set "TEST_STATUS=%ERRORLEVEL%"
-call venv\Scripts\deactivate.bat
-cd ..
+echo %BLUE%Choose test environment:%RESET%
+echo %GREEN%1.%RESET% Run tests in Docker (recommended)
+echo %GREEN%2.%RESET% Run tests locally
+echo.
 
-if "%TEST_STATUS%"=="0" (
-    echo %GREEN%✅ Backend tests passed!%RESET%
+set /p test_env="Enter your choice (1-2): "
+
+if "%test_env%"=="1" (
+    echo %YELLOW%Running tests in Docker...%RESET%
+    
+    echo %YELLOW%Running backend tests...%RESET%
+    docker-compose run --rm backend pytest
+    
+    echo %YELLOW%Running frontend tests...%RESET%
+    docker-compose run --rm frontend npm test
+) else if "%test_env%"=="2" (
+    echo %YELLOW%Running backend tests locally...%RESET%
+    cd backend
+    call venv\Scripts\activate.bat
+    python -m pytest
+    set "TEST_STATUS=%ERRORLEVEL%"
+    call venv\Scripts\deactivate.bat
+    cd ..
+
+    if "%TEST_STATUS%"=="0" (
+        echo %GREEN%✅ Backend tests passed!%RESET%
+    ) else (
+        echo %RED%❌ Backend tests failed.%RESET%
+        echo %YELLOW%Make sure the backend server is running.%RESET%
+    )
+
+    echo %YELLOW%Running frontend tests locally...%RESET%
+    cd frontend
+    npm test
+    cd ..
 ) else (
-    echo %RED%❌ Backend tests failed.%RESET%
-    echo %YELLOW%Make sure the backend server is running.%RESET%
+    echo %RED%Invalid choice. Please try again.%RESET%
+    timeout /t 2 >nul
+    goto RUN_TESTS
 )
 
 echo.

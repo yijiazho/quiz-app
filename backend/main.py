@@ -6,7 +6,7 @@ import time
 from dotenv import load_dotenv
 from app.core.logging_config import configure_logging
 from app.api import upload, ai, quiz, auth
-from app.core.database import engine, Base
+from app.core.database_config import engine, Base
 from app.core.cache import init_cache, cache
 
 # Load environment variables

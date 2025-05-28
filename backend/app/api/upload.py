@@ -1,4 +1,4 @@
-from fastapi import APIRouter, UploadFile, File, HTTPException, Request, Depends, Path
+from fastapi import APIRouter, UploadFile, File, HTTPException, Request, Depends, Path, Form
 from fastapi.responses import JSONResponse, Response, StreamingResponse
 import os
 import logging
@@ -11,11 +11,12 @@ from datetime import datetime
 from app.core.cache import cache
 import tempfile
 
-from app.core.database import get_db
+from app.core.database_config import get_db
 from app.services.file_service import FileService
 from app.schemas.file import FileMetadata, FileUploadResponse, FilesListResponse, ParsedContentResponse
 from app.services.parser_factory import ParserFactory
 from app.models.parsed_content import ParsedContent
+from app.models.file import UploadedFile
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -23,7 +24,6 @@ logger = logging.getLogger(__name__)
 
 # Update router prefix to match README specification
 router = APIRouter(prefix="/api/upload", tags=["upload"])
-file_service = FileService()
 parser_factory = ParserFactory()
 
 # Create uploads directory if it doesn't exist
@@ -43,79 +43,38 @@ async def check_upload_endpoint():
 @router.post("")  # Handle both with and without trailing slash
 async def upload_file(
     file: UploadFile = File(...),
+    title: Optional[str] = Form(None),
+    description: Optional[str] = Form(None),
     db: Session = Depends(get_db)
 ):
     """
     Upload a file.
     """
+    allowed_types = {"application/pdf", "text/plain"}
+    if file.content_type not in allowed_types:
+        raise HTTPException(status_code=400, detail="Invalid file type")
     try:
-        # Validate file type
-        allowed_types = {
-            'application/pdf': '.pdf',
-            'application/vnd.openxmlformats-officedocument.wordprocessingml.document': '.docx',
-            'application/msword': '.doc',
-            'text/plain': '.txt'
-        }
-        
-        if file.content_type not in allowed_types:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Invalid file type. Allowed types: {', '.join(allowed_types.keys())}"
-            )
-        
-        # Read file content
-        content = await file.read()
-        
-        # Save to database
-        db_file = await file_service.save_file_to_db(
-            db=db,
-            file=file,
-            file_content=content
+        file_service = FileService(db)
+        file_record = file_service.save_file(
+            file.file,
+            file.filename,
+            file.content_type,
+            title,
+            description
         )
-        
-        # Parse the content
-        try:
-            parser = parser_factory.get_parser(file.content_type)
-            # Create a temporary file to parse
-            with tempfile.NamedTemporaryFile(delete=False) as temp_file:
-                temp_file.write(content)
-                temp_file.flush()
-                parsed_result = parser.parse(temp_file.name)
-            
-            # Save parsed content to database
-            db_parsed = ParsedContent(
-                file_id=db_file.file_id,
-                parsed_text=parsed_result.content,
-                content_type=file.content_type,
-                content_metadata=parsed_result.metadata
-            )
-            db.add(db_parsed)
-            db.commit()
-            db.refresh(db_parsed)
-            
-            logger.info(f"Content parsed and saved successfully for file: {file.filename}")
-            parsed_content = db_parsed
-        except Exception as parse_error:
-            logger.error(f"Error parsing file content: {str(parse_error)}")
-            # Don't fail the upload if parsing fails
-            parsed_content = None
-        
         return {
-            "message": "File uploaded and processed successfully",
-            "file_id": db_file.file_id,
-            "filename": file.filename,
-            "parsed": parsed_content is not None
+            "file_id": file_record.file_id,
+            "filename": file_record.filename,
+            "content_type": file_record.content_type,
+            "file_size": file_record.file_size,
+            "title": file_record.title,
+            "description": file_record.description
         }
-        
     except HTTPException:
-        # Re-raise HTTP exceptions without wrapping them
         raise
     except Exception as e:
-        logger.error(f"Error uploading file: {str(e)}", exc_info=True)
-        raise HTTPException(
-            status_code=500,
-            detail=f"Error uploading file: {str(e)}"
-        )
+        logger.error(f"Error uploading file: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/files", response_model=FilesListResponse)
 def list_files(
@@ -126,21 +85,35 @@ def list_files(
     """List all uploaded files with metadata."""
     logger.info(f"Listing files with pagination (skip={skip}, limit={limit})")
     files = FileService.list_files(db, skip, limit)
+    total = db.query(UploadedFile).count()
     return {
-        "total": len(files),
+        "total": total,
         "files": files
     }
 
-@router.get("/files/{file_id}", response_model=FileMetadata)
+@router.get("/{file_id}", response_model=FileMetadata)
 def get_file_metadata(
     file_id: str = Path(..., description="The unique identifier of the file"),
     db: Session = Depends(get_db)
 ):
     """Get metadata for a specific file."""
     logger.info(f"Getting metadata for file with ID: {file_id}")
-    return FileService.get_file_metadata(db, file_id)
+    file_service = FileService(db)
+    file = file_service.get_file(file_id)
+    if not file:
+        raise HTTPException(status_code=404, detail="File not found")
+    return {
+        "file_id": file.file_id,
+        "filename": file.filename,
+        "content_type": file.content_type,
+        "file_size": file.file_size,
+        "title": file.title,
+        "description": file.description,
+        "upload_time": file.upload_time,
+        "last_accessed": file.last_accessed
+    }
 
-@router.get("/files/{file_id}/download")
+@router.get("/{file_id}/download")
 def download_file(
     file_id: str,
     db: Session = Depends(get_db)
@@ -151,7 +124,8 @@ def download_file(
     logger.info(f"Downloading file with ID: {file_id}")
     
     try:
-        file = file_service.get_file_by_id(db, file_id)
+        file_service = FileService(db)
+        file = file_service.get_file(file_id)
         if not file:
             raise HTTPException(status_code=404, detail="File not found")
             
@@ -175,7 +149,7 @@ def download_file(
             detail=f"Error downloading file: {str(e)}"
         )
 
-@router.delete("/files/{file_id}")
+@router.delete("/{file_id}")
 def delete_file(
     file_id: str = Path(..., description="The unique identifier of the file"),
     db: Session = Depends(get_db)
@@ -195,9 +169,8 @@ def delete_file(
     
     return JSONResponse(
         content={
-            "message": f"File with ID {file_id} deleted successfully"
-        },
-        status_code=200
+            "message": "File deleted successfully"
+        }
     )
 
 @router.get("/parsed-contents")
@@ -213,7 +186,8 @@ def list_parsed_contents(
     try:
         # Query parsed contents
         logger.info("Executing database query...")
-        parsed_contents = db.query(ParsedContent).offset(skip).limit(limit).all()
+        file_service = FileService(db)
+        parsed_contents = file_service.list_parsed_contents(skip, limit)
         logger.info(f"Database query returned {len(parsed_contents)} results")
         
         # Log the first few results for debugging
@@ -255,4 +229,34 @@ def list_parsed_contents(
         raise HTTPException(
             status_code=500,
             detail=f"Error listing parsed contents: {str(e)}"
-        ) 
+        )
+
+@router.patch("/{file_id}")
+async def update_file_metadata(
+    file_id: str,
+    metadata: dict,
+    db: Session = Depends(get_db)
+):
+    """Update metadata for a specific file."""
+    logger.info(f"Updating metadata for file with ID: {file_id}")
+    
+    try:
+        file_service = FileService(db)
+        file = file_service.update_file_metadata(file_id, metadata.get("title"), metadata.get("description"))
+        if not file:
+            raise HTTPException(status_code=404, detail="File not found")
+        return {
+            "file_id": file.file_id,
+            "filename": file.filename,
+            "content_type": file.content_type,
+            "file_size": file.file_size,
+            "title": file.title,
+            "description": file.description,
+            "upload_time": file.upload_time,
+            "last_accessed": file.last_accessed
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error updating file metadata: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e)) 

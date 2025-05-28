@@ -1,11 +1,15 @@
-import logging
-from datetime import datetime
+import os
+import uuid
+from datetime import datetime, UTC
+from typing import Optional, BinaryIO
 from sqlalchemy.orm import Session
 from fastapi import UploadFile, HTTPException
-from typing import Optional, List, Dict, Any
+from typing import List, Dict, Any
 
 from app.models.file import UploadedFile
 from app.models.parsed_content import ParsedContent
+from app.core.database_config import get_db
+import logging
 
 logger = logging.getLogger(__name__)
 
@@ -14,91 +18,102 @@ class FileService:
     Service for handling file operations with the database
     """
     
-    @staticmethod
-    async def save_file_to_db(
-        db: Session, 
-        file: UploadFile, 
-        file_content: bytes,
-        title: Optional[str] = None,
-        description: Optional[str] = None
-    ) -> UploadedFile:
-        """
-        Save an uploaded file to the database.
-        
-        Args:
-            db: Database session
-            file: The uploaded file
-            file_content: The binary content of the file
-            title: Optional title for the file
-            description: Optional description for the file
-            
-        Returns:
-            The created UploadedFile object
-        """
+    def __init__(self, db: Session):
+        self.db = db
+
+    def save_file(self, file: BinaryIO, filename: str, content_type: str, title: Optional[str] = None, description: Optional[str] = None) -> UploadedFile:
+        """Save a file to the database."""
         try:
-            logger.info(f"Saving file to database: {file.filename}")
+            logger.info(f"Saving file to database: {filename}")
+            logger.info(f"Received metadata - title: {title}, description: {description}")
             
-            # Create a new UploadedFile instance
-            db_file = UploadedFile(
-                filename=file.filename,
-                content_type=file.content_type,
-                file_size=len(file_content),
+            # Validate title length
+            if title and len(title) > 1000:
+                raise HTTPException(status_code=422, detail="Title must be at most 1000 characters long")
+            
+            # Read file content
+            file_content = file.read()
+            file_size = len(file_content)
+            
+            # Create file record
+            file_record = UploadedFile(
+                file_id=str(uuid.uuid4()),
+                filename=filename,
+                content_type=content_type,
+                file_size=file_size,
                 file_content=file_content,
+                upload_time=datetime.now(UTC),
                 title=title,
-                description=description,
-                upload_time=datetime.utcnow()
+                description=description
             )
             
-            # Add to database and commit
-            db.add(db_file)
-            db.commit()
-            db.refresh(db_file)
+            # Save to database
+            self.db.add(file_record)
+            self.db.commit()
+            self.db.refresh(file_record)
             
-            logger.info(f"File saved successfully to database with ID: {db_file.file_id}")
-            return db_file
+            logger.info(f"File saved successfully: {filename}")
+            logger.info(f"Saved metadata - title: {file_record.title}, description: {file_record.description}")
+            return file_record
             
         except Exception as e:
-            db.rollback()
-            logger.error(f"Error saving file to database: {str(e)}")
-            raise HTTPException(
-                status_code=500,
-                detail=f"Failed to save file to database: {str(e)}"
-            )
-    
-    @staticmethod
-    def get_file_by_id(db: Session, file_id: str) -> Optional[UploadedFile]:
-        """
-        Get a file by its ID.
-        
-        Args:
-            db: Database session
-            file_id: ID of the file to retrieve
-            
-        Returns:
-            The file if found, None otherwise
-        """
-        logger.info(f"Retrieving file with ID: {file_id}")
-        
+            import traceback
+            logger.error(f"Error saving file to database: {str(e)}\n{traceback.format_exc()}")
+            self.db.rollback()
+            raise
+
+    def get_file(self, file_id: str) -> Optional[UploadedFile]:
+        """Get a file from the database."""
         try:
-            file = db.query(UploadedFile).filter(UploadedFile.file_id == file_id).first()
-            
+            file = self.db.query(UploadedFile).filter(UploadedFile.file_id == file_id).first()
             if file:
-                # Update last accessed time
-                file.last_accessed = datetime.utcnow()
-                db.commit()
-                logger.info(f"File retrieved successfully: {file.filename}")
-            else:
-                logger.warning(f"File not found with ID: {file_id}")
-                
+                file.last_accessed = datetime.now(UTC)
+                self.db.commit()
             return file
-            
         except Exception as e:
-            logger.error(f"Error retrieving file: {str(e)}")
-            raise HTTPException(
-                status_code=500,
-                detail=f"Failed to retrieve file: {str(e)}"
-            )
-    
+            self.db.rollback()
+            logger.error(f"Error getting file from database: {str(e)}")
+            raise
+
+    def list_files(self) -> list[UploadedFile]:
+        """List all files in the database."""
+        try:
+            return self.db.query(UploadedFile).all()
+        except Exception as e:
+            logger.error(f"Error listing files from database: {str(e)}")
+            raise
+
+    def delete_file(self, file_id: str) -> bool:
+        """Delete a file from the database."""
+        try:
+            file = self.db.query(UploadedFile).filter(UploadedFile.file_id == file_id).first()
+            if file:
+                self.db.delete(file)
+                self.db.commit()
+                return True
+            return False
+        except Exception as e:
+            self.db.rollback()
+            logger.error(f"Error deleting file from database: {str(e)}")
+            raise
+
+    def update_file_metadata(self, file_id: str, title: Optional[str] = None, description: Optional[str] = None) -> Optional[UploadedFile]:
+        """Update file metadata."""
+        try:
+            file = self.db.query(UploadedFile).filter(UploadedFile.file_id == file_id).first()
+            if file:
+                if title is not None:
+                    file.title = title
+                if description is not None:
+                    file.description = description
+                self.db.commit()
+                self.db.refresh(file)
+            return file
+        except Exception as e:
+            self.db.rollback()
+            logger.error(f"Error updating file metadata: {str(e)}")
+            raise
+
     @staticmethod
     def get_file_metadata(db: Session, file_id: str) -> Dict[str, Any]:
         """
@@ -193,4 +208,11 @@ class FileService:
             raise HTTPException(
                 status_code=500,
                 detail=f"Failed to delete file: {str(e)}"
-            ) 
+            )
+
+    @staticmethod
+    def get_file_by_id(db: Session, file_id: str) -> Optional[UploadedFile]:
+        """
+        Retrieve a file by its ID using the provided database session.
+        """
+        return db.query(UploadedFile).filter(UploadedFile.file_id == file_id).first() 

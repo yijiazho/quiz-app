@@ -4,10 +4,11 @@ import logging
 from app.core.config import settings
 from app.api import upload, files, auth
 import os
-from app.core.database import Base, engine
+from app.core.database_config import Base, engine
 from app.models import UploadedFile, ParsedContent
-from app.core.database_config import db_config, DatabaseError
+from app.core.database_config import config, DatabaseError
 from app.core.migrations import migration_manager
+from sqlalchemy.orm import Session
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -40,7 +41,7 @@ async def startup_event():
     logger.info("Starting up QuizForge API")
     
     # Test database connection
-    if not db_config.test_connection():
+    if not config.test_connection():
         logger.error("Failed to connect to database")
         raise RuntimeError("Database connection failed")
     logger.info("Database connection test successful")
@@ -48,8 +49,13 @@ async def startup_event():
     # Apply database migrations
     try:
         logger.info("Applying database migrations...")
-        migration_manager.apply_migrations()
-        logger.info("Database migrations applied successfully")
+        # Create a new session for migrations
+        session = Session(bind=engine)
+        try:
+            migration_manager.apply_migrations(session)
+            logger.info("Database migrations applied successfully")
+        finally:
+            session.close()
     except DatabaseError as e:
         logger.error(f"Failed to apply database migrations: {str(e)}")
         raise RuntimeError(f"Database migration failed: {str(e)}")
@@ -81,11 +87,11 @@ async def health_check():
     """Health check endpoint that verifies database connection and initialization."""
     try:
         # Test database connection
-        if not db_config.test_connection():
+        if not config.test_connection():
             raise HTTPException(status_code=503, detail="Database connection failed")
         
         # Get database info
-        db_info = db_config.get_db_info()
+        db_info = config.get_db_info()
         
         # Get migration status
         applied_migrations = migration_manager.get_applied_migrations()

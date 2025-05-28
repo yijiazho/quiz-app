@@ -4,7 +4,7 @@ import logging
 from typing import List, Dict, Any
 from datetime import datetime
 
-from app.core.database import get_db
+from app.core.database_config import get_db
 from app.models.parsed_content import ParsedContent
 from app.models.file import UploadedFile
 from app.services.file_service import FileService

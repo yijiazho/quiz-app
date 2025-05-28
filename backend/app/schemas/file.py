@@ -4,7 +4,6 @@ from typing import Optional, List, Dict, Any
 
 class FileMetadata(BaseModel):
     """Schema for file metadata response"""
-    id: int
     file_id: str
     filename: str
     content_type: str

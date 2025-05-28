@@ -23,7 +23,7 @@ class ParsedContent(Base):
     last_updated = Column(DateTime, onupdate=func.now())
     
     # Relationship with UploadedFile
-    file = relationship("UploadedFile", back_populates="parsed_content")
+    file = relationship("UploadedFile", back_populates="parsed_contents")
     
     def __repr__(self):
         """String representation of the model"""
