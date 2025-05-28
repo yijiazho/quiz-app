@@ -29,14 +29,48 @@ QuizForge is an AI-powered web application that allows users to upload textbook 
 ## Getting Started
 
 ### Prerequisites
-- Node.js (v18 or higher)
-- Python 3.12
-- npm or yarn
+- Docker and Docker Compose (recommended)
+- Node.js (v18 or higher) - only needed for local development
+- Python 3.12 - only needed for local development
+- npm or yarn - only needed for local development
 - Git
 
 ### Setup
 
-#### Option 1: Using the macOS Setup Script (Recommended for macOS)
+#### Option 1: Using Docker (Recommended)
+
+1. Clone the repository:
+   ```bash
+   git clone https://github.com/yourusername/quizforge.git
+   cd quizforge
+   ```
+
+2. Create a `.env` file in the root directory:
+   ```bash
+   cp .env.example .env
+   ```
+   Then edit `.env` with your configuration:
+   ```
+   DATABASE_URL=sqlite:///quiz_app.db
+   SECRET_KEY=your-secret-key
+   OPENAI_API_KEY=your_openai_api_key_here
+   ```
+
+3. Start the application using Docker Compose:
+   ```bash
+   docker-compose up -d
+   ```
+
+   The application will be available at:
+   - Frontend: http://localhost:3000
+   - Backend: http://localhost:8000
+
+4. To stop the application:
+   ```bash
+   docker-compose down
+   ```
+
+#### Option 2: Using the macOS Setup Script (Recommended for macOS)
 
 1. Make the setup script executable:
    ```bash
@@ -56,7 +90,7 @@ The script will:
 - Set up the frontend dependencies
 - Create necessary .env files
 
-#### Option 2: Manual Setup
+#### Option 3: Manual Setup
 
 ##### Frontend Setup
 1. Navigate to the frontend directory:
@@ -121,17 +155,24 @@ The script will:
 ## Development
 
 ### Running Tests
-- Frontend tests:
+- Using Docker:
   ```bash
-  cd frontend
-  npm test
+  docker-compose run backend pytest
+  docker-compose run frontend npm test
   ```
-- Backend tests:
-  ```bash
-  cd backend
-  source venv/bin/activate
-  pytest
-  ```
+
+- Local development:
+  - Frontend tests:
+    ```bash
+    cd frontend
+    npm test
+    ```
+  - Backend tests:
+    ```bash
+    cd backend
+    source venv/bin/activate
+    pytest
+    ```
 
 ### Code Style
 - Frontend: ESLint and Prettier
@@ -141,7 +182,19 @@ The script will:
 
 ### Common Issues
 
-1. **Port Already in Use**
+1. **Docker Issues**
+   ```bash
+   # Rebuild containers
+   docker-compose build --no-cache
+   
+   # View logs
+   docker-compose logs -f
+   
+   # Restart containers
+   docker-compose restart
+   ```
+
+2. **Port Already in Use**
    ```bash
    # Find process using port 3000 (frontend)
    lsof -i :3000
@@ -151,14 +204,14 @@ The script will:
    kill -9 <PID>
    ```
 
-2. **Node Modules Issues**
+3. **Node Modules Issues**
    ```bash
    cd frontend
    rm -rf node_modules
    npm install
    ```
 
-3. **Python Virtual Environment Issues**
+4. **Python Virtual Environment Issues**
    ```bash
    cd backend
    rm -rf venv
@@ -167,14 +220,14 @@ The script will:
    pip install -r requirements.txt
    ```
 
-4. **Database Issues**
+5. **Database Issues**
    ```bash
    cd backend
    rm quiz_app.db
    # The database will be recreated on next server start
    ```
 
-5. **macOS-specific Issues**
+6. **macOS-specific Issues**
    - If you get permission errors when running scripts:
      ```bash
      chmod +x setup_mac.sh
@@ -216,6 +269,10 @@ quiz-app/
 │   │   └── schemas/          # Pydantic schemas
 │   ├── requirements.txt
 │   └── .env                  # Backend environment variables
+├── docker/                    # Docker configuration files
+│   ├── frontend/             # Frontend Dockerfile
+│   └── backend/              # Backend Dockerfile
+├── docker-compose.yml        # Docker Compose configuration
 ├── setup_mac.sh              # macOS setup script
 └── README.md
 ```
