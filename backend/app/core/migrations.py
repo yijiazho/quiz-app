@@ -3,7 +3,7 @@ from typing import List, Optional, Dict, Callable
 from sqlalchemy import text, func
 from sqlalchemy.exc import SQLAlchemyError
 import logging
-from .database_config import config, DatabaseError
+from .database_config import config, DatabaseError, engine
 from sqlalchemy.orm import Session
 from datetime import datetime
 
@@ -114,44 +114,54 @@ class MigrationManager:
             logger.error(f"Failed to initialize migrations table: {str(e)}")
             raise
 
-    def get_applied_migrations(self, db: Session) -> list[int]:
+    def get_applied_migrations(self) -> list[int]:
         """Get the list of applied migrations."""
         try:
-            result = db.execute(text("SELECT version FROM migrations ORDER BY version")).fetchall()
-            return [row[0] for row in result]
+            with Session(engine) as db:
+                self.init_migrations_table(db)
+                result = db.execute(text("SELECT version FROM migrations ORDER BY version")).fetchall()
+                return [row[0] for row in result]
         except Exception as e:
             logger.error(f"Failed to get applied migrations: {str(e)}")
             raise
 
-    def apply_migrations(self, db: Session) -> None:
+    def apply_migrations(self, session: Optional[Session] = None) -> None:
         """Apply all pending migrations."""
         try:
-            self.init_migrations_table(db)
-            applied = set(self.get_applied_migrations(db))
-            
-            for version, migration in sorted(self._migrations.items()):
-                if version not in applied:
-                    try:
-                        # Apply migration
-                        db.execute(text(migration.sql))
-                        # Record migration
-                        db.execute(
-                            text("INSERT INTO migrations (version, name) VALUES (:version, :name)"),
-                            {"version": version, "name": migration.name}
-                        )
-                        db.commit()
-                        logger.info(f"Applied migration {version}: {migration.name}")
-                    except Exception as e:
-                        db.rollback()
-                        logger.error(f"Failed to apply migration {version}: {str(e)}")
-                        raise
+            if session is None:
+                with Session(engine) as db:
+                    self._apply_migrations_internal(db)
+            else:
+                self._apply_migrations_internal(session)
         except Exception as e:
             logger.error(f"Migration failed: {str(e)}")
             raise RuntimeError(f"Database migration failed: {str(e)}")
+
+    def _apply_migrations_internal(self, db: Session) -> None:
+        """Internal method to apply migrations using the provided session."""
+        self.init_migrations_table(db)
+        applied = set(self.get_applied_migrations())
+        
+        for version, migration in sorted(self._migrations.items()):
+            if version not in applied:
+                try:
+                    # Apply migration
+                    db.execute(text(migration.sql))
+                    # Record migration
+                    db.execute(
+                        text("INSERT INTO migrations (version, name) VALUES (:version, :name)"),
+                        {"version": version, "name": migration.name}
+                    )
+                    db.commit()
+                    logger.info(f"Applied migration {version}: {migration.name}")
+                except Exception as e:
+                    db.rollback()
+                    logger.error(f"Failed to apply migration {version}: {str(e)}")
+                    raise
 
 # Create a singleton instance
 migration_manager = MigrationManager()
 
 def run_migrations(db: Session) -> None:
     """Run all pending migrations."""
-    migration_manager.apply_migrations(db) 
+    migration_manager.apply_migrations() 

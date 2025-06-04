@@ -10,10 +10,9 @@ services:
     volumes:
       - ./frontend:/app
       - /app/node_modules
-      - /app/.next
+      - next_build:/app/.next
     environment:
-      - NODE_ENV=development
-      - NEXT_TELEMETRY_DISABLED=1
+      - NEXT_PUBLIC_API_URL=http://localhost:8000
     depends_on:
       - backend
 
@@ -25,26 +24,29 @@ services:
       - "8000:8000"
     volumes:
       - ./backend:/app
-      - ./backend/data:/app/data
+      - ./backend/quiz_app.db:/app/instance/app.db
     environment:
-      - DATABASE_URL=sqlite:///./data/quiz_app.db
+      - DATABASE_URL=sqlite:///app/instance/app.db
       - SECRET_KEY=your-secret-key-here
-      - ENVIRONMENT=development
-      - LOG_LEVEL=INFO
+      - OPENAI_API_KEY=your-openai-api-key-here
 
   adminer:
-    image: adminer:4.8.1
-    restart: always
+    build:
+      context: ./docker/adminer
+      dockerfile: Dockerfile
     ports:
       - "8080:8080"
-    volumes:
-      - ./backend/data:/data
     environment:
+      - ADMINER_DEFAULT_SERVER=backend
       - ADMINER_DESIGN=pepa-linha
-    command: php -S 0.0.0.0:8080
+    volumes:
+      - ./backend/quiz_app.db:/app/instance/app.db
+    depends_on:
+      - backend
 
 volumes:
   postgres_data:
+  next_build:
 
 networks:
   app-network:

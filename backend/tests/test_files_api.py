@@ -156,7 +156,7 @@ def test_list_files_database_error(client):
 
 def test_upload_file(client, test_db):
     """Test file upload endpoint."""
-    with patch('app.services.file_service.FileService.save_file_to_db') as mock_save:
+    with patch('app.services.file_service.FileService.save_file') as mock_save:
         mock_save.return_value = UploadedFile(
             file_id="test-file-1",
             filename="test.pdf",
@@ -175,7 +175,8 @@ def test_upload_file(client, test_db):
         data = response.json()
         assert data["file_id"] == "test-file-1"
         assert data["filename"] == "test.pdf"
-        assert "parsed" in data
+        assert data["content_type"] == "application/pdf"
+        assert data["file_size"] == 1024
 
 def test_get_file(client, setup_test_data):
     """Test get file endpoint."""
@@ -230,4 +231,12 @@ def test_delete_file(client, setup_test_data):
 def test_delete_file_not_found(client):
     """Test delete file endpoint with non-existent file."""
     response = client.delete("/api/files/non-existent-id")
-    assert response.status_code == 404 
+    assert response.status_code == 404
+
+def test_tables_exist(test_db):
+    """Test that all expected tables exist in the test database."""
+    expected_tables = {"users", "uploaded_files", "parsed_contents", "quizzes", "migrations"}
+    result = test_db.execute(text("SELECT name FROM sqlite_master WHERE type='table';")).fetchall()
+    table_names = {row[0] for row in result}
+    missing = expected_tables - table_names
+    assert not missing, f"Missing tables: {missing}" 

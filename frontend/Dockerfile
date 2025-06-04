@@ -17,12 +17,21 @@ FROM node:18-alpine
 
 WORKDIR /app
 
+# Create a non-root user
+RUN addgroup -S appgroup && adduser -S appuser -G appgroup
+
 # Copy node_modules and package files from builder
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/package*.json ./
 
 # Copy the rest of the application
 COPY . .
+
+# Set proper permissions
+RUN chown -R appuser:appgroup /app
+
+# Switch to non-root user
+USER appuser
 
 # Expose port
 EXPOSE 3000
