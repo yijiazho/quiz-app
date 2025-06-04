@@ -73,7 +73,7 @@ class FileService:
         except Exception as e:
             self.db.rollback()
             logger.error(f"Error getting file from database: {str(e)}")
-            raise
+            raise HTTPException(status_code=404, detail="File not found")
 
     def list_files(self) -> list[UploadedFile]:
         """List all files in the database."""
@@ -95,7 +95,7 @@ class FileService:
         except Exception as e:
             self.db.rollback()
             logger.error(f"Error deleting file from database: {str(e)}")
-            raise
+            raise HTTPException(status_code=404, detail="File not found")
 
     def update_file_metadata(self, file_id: str, title: Optional[str] = None, description: Optional[str] = None) -> Optional[UploadedFile]:
         """Update file metadata."""
