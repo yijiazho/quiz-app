@@ -58,7 +58,15 @@ class DatabaseConfig:
     def init_db(self) -> None:
         """Initialize the database by creating all tables."""
         try:
+            # Create all tables defined in models
             Base.metadata.create_all(bind=self.engine)
+            
+            # Verify tables exist
+            with self.engine.connect() as conn:
+                tables = conn.execute(text("SELECT name FROM sqlite_master WHERE type='table'")).fetchall()
+                table_names = [table[0] for table in tables]
+                logger.info(f"Created tables: {table_names}")
+            
             logger.info("Database initialized successfully")
         except SQLAlchemyError as e:
             logger.error(f"Failed to initialize database: {str(e)}")

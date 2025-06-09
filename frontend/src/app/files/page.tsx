@@ -8,7 +8,7 @@ import FilesList from '../../components/FilesList'
 async function getFiles() {
   console.log('=== Starting server-side data fetch ===');
   const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
-  const url = `${API_URL}/api/upload/parsed-contents`;
+  const url = `${API_URL}/api/files/`;
   console.log('Fetching from URL:', url);
 
   try {

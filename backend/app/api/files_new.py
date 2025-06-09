@@ -8,7 +8,6 @@ from app.core.database_config import get_db
 from app.models.parsed_content import ParsedContent
 from app.models.file import UploadedFile
 from app.services.file_service import FileService
-from app.api.auth import oauth2_scheme
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -17,10 +16,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/files", tags=["files"])
 
 @router.get("/")
-async def list_files(
-    token: str = Depends(oauth2_scheme),
-    db: Session = Depends(get_db)
-):
+async def list_files(db: Session = Depends(get_db)):
     """List all uploaded files."""
     logger.info("=== Starting files list request ===")
     
@@ -68,11 +64,7 @@ async def list_files(
         )
 
 @router.get("/{file_id}")
-async def get_file(
-    file_id: str,
-    token: str = Depends(oauth2_scheme),
-    db: Session = Depends(get_db)
-):
+async def get_file(file_id: str, db: Session = Depends(get_db)):
     """Get file metadata."""
     logger.info(f"Getting file metadata for ID: {file_id}")
     
@@ -93,11 +85,7 @@ async def get_file(
         )
 
 @router.get("/{file_id}/content")
-async def get_file_content(
-    file_id: str,
-    token: str = Depends(oauth2_scheme),
-    db: Session = Depends(get_db)
-):
+async def get_file_content(file_id: str, db: Session = Depends(get_db)):
     """Get parsed file content."""
     logger.info(f"Getting file content for ID: {file_id}")
     
@@ -124,11 +112,7 @@ async def get_file_content(
         )
 
 @router.delete("/{file_id}")
-async def delete_file(
-    file_id: str,
-    token: str = Depends(oauth2_scheme),
-    db: Session = Depends(get_db)
-):
+async def delete_file(file_id: str, db: Session = Depends(get_db)):
     """Delete a file."""
     logger.info(f"Deleting file with ID: {file_id}")
     

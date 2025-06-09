@@ -1,13 +1,25 @@
-from app.core.database import Base, engine
-from app.models.user import User
-from app.models.file import UploadedFile
-from app.core.migrations import migration_manager
+"""Initialize the database and run migrations."""
+import logging
+from .database_config import config, engine
+from .migrations import run_migrations
+from sqlalchemy.orm import Session
 
-def init_db():
-    """Initialize the database with migrations"""
-    # Apply all migrations
-    migration_manager.apply_migrations()
+logger = logging.getLogger(__name__)
+
+def init_database():
+    """Initialize the database and run migrations."""
+    try:
+        # Create tables
+        config.init_db()
+        
+        # Run migrations
+        with Session(engine) as db:
+            run_migrations(db)
+            
+        logger.info("Database initialized and migrations applied successfully")
+    except Exception as e:
+        logger.error(f"Failed to initialize database: {str(e)}")
+        raise
 
 if __name__ == "__main__":
-    init_db()
-    print("Database initialized successfully!") 
+    init_database() 
