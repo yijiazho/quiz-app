@@ -1,33 +1,38 @@
 import pytest
-from app.core.database_config import config, Base
-from app.main import app
+import os
+from sqlalchemy import create_engine, text
+from sqlalchemy.orm import sessionmaker
 from fastapi.testclient import TestClient
-from sqlalchemy.orm import Session
-from app.core.migrations import run_migrations
+from app.core.database import Base
+from app.main import app
+from app.core.database_config import get_db
 import logging
-from sqlalchemy.sql import text
 
 logger = logging.getLogger(__name__)
 
-@pytest.fixture(scope="session")
+# Use file-based SQLite for tests
+TEST_DATABASE_URL = "sqlite:///./test.db"
+TEST_DB_PATH = "./test.db"
+engine = create_engine(TEST_DATABASE_URL, connect_args={"check_same_thread": False})
+TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+
+@pytest.fixture(scope="session", autouse=True)
+def cleanup_test_db_file():
+    if os.path.exists(TEST_DB_PATH):
+        os.remove(TEST_DB_PATH)
+    yield
+    # Do not remove at teardown to avoid PermissionError
+
+@pytest.fixture(scope="function")
 def test_db():
     """Create a test database session."""
-    # Create all tables
-    Base.metadata.create_all(bind=config.engine)
-    
-    # Create a new session
-    connection = config.engine.connect()
-    transaction = connection.begin()
-    session = Session(bind=connection)
-    
+    Base.metadata.create_all(bind=engine)
+    db = TestingSessionLocal()
     try:
-        yield session
+        yield db
     finally:
-        session.close()
-        transaction.rollback()
-        connection.close()
-        # Drop all tables
-        Base.metadata.drop_all(bind=config.engine)
+        db.close()
+        Base.metadata.drop_all(bind=engine)
 
 @pytest.fixture
 def client(test_db):
@@ -37,9 +42,11 @@ def client(test_db):
             yield test_db
         finally:
             pass  # Don't close the session here, it's managed by the test_db fixture
-    
+
     app.dependency_overrides[get_db] = override_get_db
-    return TestClient(app)
+    with TestClient(app) as test_client:
+        yield test_client
+    app.dependency_overrides.clear()
 
 @pytest.fixture
 def db(test_db):

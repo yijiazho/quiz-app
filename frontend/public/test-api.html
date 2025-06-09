@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>API Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        pre { background: #f5f5f5; padding: 10px; border-radius: 5px; }
+        .error { color: red; }
+        .success { color: green; }
+    </style>
+</head>
+<body>
+    <h1>API Test</h1>
+    <div id="result">Loading...</div>
+
+    <script>
+        async function testApi() {
+            const resultDiv = document.getElementById('result');
+            try {
+                const response = await fetch('http://localhost:8000/api/files/');
+                const data = await response.json();
+                
+                resultDiv.innerHTML = `
+                    <h2 class="success">API Test Successful</h2>
+                    <h3>Response Status: ${response.status}</h3>
+                    <h3>Headers:</h3>
+                    <pre>${JSON.stringify(Object.fromEntries(response.headers), null, 2)}</pre>
+                    <h3>Data:</h3>
+                    <pre>${JSON.stringify(data, null, 2)}</pre>
+                `;
+            } catch (error) {
+                resultDiv.innerHTML = `
+                    <h2 class="error">API Test Failed</h2>
+                    <pre>${error.message}</pre>
+                `;
+            }
+        }
+
+        testApi();
+    </script>
+</body>
+</html> 

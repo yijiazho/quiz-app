@@ -37,7 +37,6 @@ class FileService:
             
             # Create file record
             file_record = UploadedFile(
-                file_id=str(uuid.uuid4()),
                 filename=filename,
                 content_type=content_type,
                 file_size=file_size,
@@ -66,14 +65,17 @@ class FileService:
         """Get a file from the database."""
         try:
             file = self.db.query(UploadedFile).filter(UploadedFile.file_id == file_id).first()
-            if file:
-                file.last_accessed = datetime.now(UTC)
-                self.db.commit()
+            if not file:
+                raise HTTPException(status_code=404, detail="File not found")
+            file.last_accessed = datetime.now(UTC)
+            self.db.commit()
             return file
+        except HTTPException:
+            raise
         except Exception as e:
             self.db.rollback()
             logger.error(f"Error getting file from database: {str(e)}")
-            raise HTTPException(status_code=404, detail="File not found")
+            raise HTTPException(status_code=500, detail="Internal server error")
 
     def list_files(self) -> list[UploadedFile]:
         """List all files in the database."""
@@ -81,38 +83,43 @@ class FileService:
             return self.db.query(UploadedFile).all()
         except Exception as e:
             logger.error(f"Error listing files from database: {str(e)}")
-            raise
+            raise HTTPException(status_code=500, detail="Internal server error")
 
     def delete_file(self, file_id: str) -> bool:
         """Delete a file from the database."""
         try:
             file = self.db.query(UploadedFile).filter(UploadedFile.file_id == file_id).first()
-            if file:
-                self.db.delete(file)
-                self.db.commit()
-                return True
-            return False
+            if not file:
+                raise HTTPException(status_code=404, detail="File not found")
+            self.db.delete(file)
+            self.db.commit()
+            return True
+        except HTTPException:
+            raise
         except Exception as e:
             self.db.rollback()
             logger.error(f"Error deleting file from database: {str(e)}")
-            raise HTTPException(status_code=404, detail="File not found")
+            raise HTTPException(status_code=500, detail="Internal server error")
 
     def update_file_metadata(self, file_id: str, title: Optional[str] = None, description: Optional[str] = None) -> Optional[UploadedFile]:
         """Update file metadata."""
         try:
             file = self.db.query(UploadedFile).filter(UploadedFile.file_id == file_id).first()
-            if file:
-                if title is not None:
-                    file.title = title
-                if description is not None:
-                    file.description = description
-                self.db.commit()
-                self.db.refresh(file)
+            if not file:
+                raise HTTPException(status_code=404, detail="File not found")
+            if title is not None:
+                file.title = title
+            if description is not None:
+                file.description = description
+            self.db.commit()
+            self.db.refresh(file)
             return file
+        except HTTPException:
+            raise
         except Exception as e:
             self.db.rollback()
             logger.error(f"Error updating file metadata: {str(e)}")
-            raise
+            raise HTTPException(status_code=500, detail="Internal server error")
 
     @staticmethod
     def get_file_metadata(db: Session, file_id: str) -> Dict[str, Any]:
@@ -126,15 +133,16 @@ class FileService:
         Returns:
             The file metadata as a dictionary
         """
-        db_file = FileService.get_file_by_id(db, file_id)
-        
-        if not db_file:
-            raise HTTPException(
-                status_code=404,
-                detail=f"File with ID {file_id} not found"
-            )
-            
-        return db_file.to_dict()
+        try:
+            db_file = FileService.get_file_by_id(db, file_id)
+            if not db_file:
+                raise HTTPException(status_code=404, detail=f"File with ID {file_id} not found")
+            return db_file.to_dict()
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error(f"Error getting file metadata: {str(e)}")
+            raise HTTPException(status_code=500, detail="Internal server error")
     
     @staticmethod
     def list_files(db: Session, skip: int = 0, limit: int = 100) -> List[Dict[str, Any]]:
@@ -163,10 +171,7 @@ class FileService:
             
         except Exception as e:
             logger.error(f"Error listing files from database: {str(e)}")
-            raise HTTPException(
-                status_code=500,
-                detail=f"Failed to list files from database: {str(e)}"
-            )
+            raise HTTPException(status_code=500, detail="Internal server error")
     
     @staticmethod
     def delete_file(db: Session, file_id: str) -> bool:
@@ -186,8 +191,7 @@ class FileService:
             # Get the file
             file = FileService.get_file_by_id(db, file_id)
             if not file:
-                logger.warning(f"File not found: {file_id}")
-                return False
+                raise HTTPException(status_code=404, detail=f"File with ID {file_id} not found")
                 
             # Delete parsed content first
             parsed_content = db.query(ParsedContent).filter(ParsedContent.file_id == file_id).first()
@@ -202,13 +206,12 @@ class FileService:
             logger.info(f"File deleted successfully: {file_id}")
             return True
             
+        except HTTPException:
+            raise
         except Exception as e:
             logger.error(f"Error deleting file from database: {str(e)}")
             db.rollback()
-            raise HTTPException(
-                status_code=500,
-                detail=f"Failed to delete file: {str(e)}"
-            )
+            raise HTTPException(status_code=500, detail="Internal server error")
 
     @staticmethod
     def get_file_by_id(db: Session, file_id: str) -> Optional[UploadedFile]:

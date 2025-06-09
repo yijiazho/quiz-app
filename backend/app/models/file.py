@@ -14,7 +14,7 @@ class UploadedFile(Base):
     """Model for storing uploaded files in the database"""
     __tablename__ = "uploaded_files"
 
-    file_id = Column(String, primary_key=True)
+    file_id = Column(String, primary_key=True, default=generate_uuid)
     filename = Column(String, nullable=False)
     content_type = Column(String, nullable=False)
     file_size = Column(Integer, nullable=False)

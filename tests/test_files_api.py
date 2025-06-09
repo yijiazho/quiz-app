@@ -2,27 +2,26 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 from datetime import datetime, UTC
+import io
 import uuid
-from app.main import app
-from app.core.database_config import config
+
+from app.core.database_config import Base, get_db, engine
 from app.models.file import UploadedFile
 from app.models.parsed_content import ParsedContent
+from app.main import app
 
 @pytest.fixture
-def client():
-    return TestClient(app)
-
-@pytest.fixture
-def db():
-    db = config.SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
+def client(test_db):
+    """Create a test client with the test database"""
+    def override_get_db():
+        yield test_db
+    app.dependency_overrides[get_db] = override_get_db
+    with TestClient(app) as test_client:
+        yield test_client
 
 def test_list_files_empty(client: TestClient, db: Session):
     """Test listing files when database is empty"""
-    response = client.get("/api/files/")
+    response = client.get("/api/files")
     assert response.status_code == 200
     data = response.json()
     assert data["total"] == 0
@@ -67,7 +66,7 @@ def test_list_files_with_data(client: TestClient, db: Session):
     db.commit()
     
     # Test the endpoint
-    response = client.get("/api/files/")
+    response = client.get("/api/files")
     assert response.status_code == 200
     data = response.json()
     
@@ -100,6 +99,6 @@ def test_list_files_database_error(client: TestClient, db: Session):
     # Force a database error by closing the session
     db.close()
     
-    response = client.get("/api/files/")
+    response = client.get("/api/files")
     assert response.status_code == 500
-    assert "Error listing files" in response.json()["detail"]
+    assert "Error listing files" in response.json()["detail"] 
